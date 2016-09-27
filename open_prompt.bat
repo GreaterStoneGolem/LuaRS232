@@ -1,0 +1,1 @@
+@cmd.exe /K @echo Just a prompt.
