@@ -2,6 +2,7 @@
 
 #include "conversion.h"
 #include "keypress.h"
+#include "sleep.h"
 #include "LuaRS232.h"
 #include "rs232_comm.h"
 #include <stdio.h>
@@ -16,7 +17,8 @@ static int PrintHelloWorld(lua_State* L)
 static const struct luaL_Reg LuaRS232API[] = {
 	// Loading the library returns a table with:
 	// - General helper functions
-	// - RS-232 functions
+	// - A function to open a serial port
+	// The rest of the API is provided as member functions of the object returned by a succesfull Open
 
 	// Functions to help translate strings:
 	{"Hex2Bin",Hex2Bin},
@@ -26,18 +28,11 @@ static const struct luaL_Reg LuaRS232API[] = {
 	// Functions to improve interactivity:
 	{"GetKeyPress",GetKeyPress},
 
-	// RS-232 interface functions
-	{"Open",LuaRS232_Open},
-	{"Close",LuaRS232_Close},
-	{"Poll",LuaRS232_Receive},
-	{"Send",LuaRS232_Send},
-	{"EnableDTR",LuaRS232_EnableDTR},
-	{"DisableDTR",LuaRS232_DisableDTR},
-	{"EnableRTS",LuaRS232_EnableRTS},
-	{"DisableRTS",LuaRS232_DisableRTS},
-	{"GetPinStatus",LuaRS232_GetPinStatus},
-	{"FlushRX",LuaRS232_FlushRX},
-	{"FlushTX",LuaRS232_FlushTX},
+	// Function to wait for n milliseconds:
+	{"Sleep",LuaSleep},
+
+	// Function to open a comm port, return a table with the rest of the interface
+	{"SerialPortOpen",LuaRS232_Open},
 
 	// Early test and example of C Lua bindings
 	{"SayHello",PrintHelloWorld},

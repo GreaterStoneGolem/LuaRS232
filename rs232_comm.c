@@ -1,36 +1,86 @@
 
-
 #include "rs232_comm.h"// Header of this .c file, doing the bridge between Lua and the RS232 C library
 #include "rs232.h"// Header of the RS232 library I got from internet
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h> 
-#include <unistd.h> // for nanosleep
+#include "sleep.h"// Header of my function that add sleep in Lua
 
 // Size and buffer where data is received
 #define MAX_RECEIVE 1024
 unsigned char receptionbuffer[MAX_RECEIVE];
 
-// Because the lib I wrap requires it at every step, but I only want to precise it during open
-// I create this global holding the port number of the open port, or -1 if none yet opened
-int currentportnumber=-1;
+// List function to add a to serial port
+struct luaL_Reg SerialPortAPI[] = {
+	// RS-232 interface functions
+	{"Open",LuaRS232_Open},// Open is to be called not from there but by what return this table
+	{"Close",LuaRS232_Close},// Called automatically by garbage collector
+	{"Receive",LuaRS232_Receive},
+	{"Send",LuaRS232_Send},
+	{"EnableDTR",LuaRS232_EnableDTR},
+	{"DisableDTR",LuaRS232_DisableDTR},
+	{"EnableRTS",LuaRS232_EnableRTS},
+	{"DisableRTS",LuaRS232_DisableRTS},
+	{"GetPinStatus",LuaRS232_GetPinStatus},
+	{"FlushRX",LuaRS232_FlushRX},
+	{"FlushTX",LuaRS232_FlushTX},
+	{"Sleep",LuaRS232_Sleep},
+	{NULL,NULL}
+};
+
+
+// All my other function must be called by passing as first argument:
+// - A Serial Comm Object, that is, a Lua table, with internal.portnbr as a field
+// So this function look at the first object of the stack
+// Check it is a table, with a element with name internal that is itself a table with an element portnbr which is a number
+// And it returns this number
+// Otherwise, throws a Lua error
+int GetPortNbr(lua_State *L)
+{
+	if(!lua_istable(L,1))
+	{
+		lua_pushstring(L,"Error: First stack element is not a RS-232 object");
+	}
+	else if(lua_getfield(L,1,"internal")!=LUA_TTABLE)
+	{
+		lua_pushstring(L,"Error: First stack element is a table without an internal table");
+	}
+	else if(lua_getfield(L,-1,"portnbr")!=LUA_TNUMBER)
+	{
+		lua_pushstring(L,"Error: First stack element is a table with an internal table without a portnbr number");
+	}
+	else
+	{
+		return lua_tointeger(L,-1);
+	}
+	return lua_error(L);
+}
+
+
+const char* GetPortName(lua_State *L)
+{
+	if(!lua_istable(L,1))
+	{
+		lua_pushstring(L,"Error: First stack element is not a RS-232 object");
+	}
+	else if(lua_getfield(L,1,"name")!=LUA_TSTRING)
+	{
+		lua_pushstring(L,"Error: First stack element is a table without an name string");
+	}
+	else
+	{
+		return lua_tostring(L,-1);
+	}
+	lua_error(L);
+	return "";// Never happens, but to respect C signature
+}
+
 
 
 
 int LuaRS232_Open(lua_State* L)
 {
-	// I don't want to deal with supporting multiple open serial comm in the same time for now
-	if(currentportnumber>=0)
-	{
-		lua_pushstring(L,"RS232 Open error: There's already one open, and multiple simultaneous serial communications not supported yet.");
-		return lua_error(L);
-	}
-
 	// Check that function was called with parameters of proper types
 	if(lua_gettop(L)<1 || !lua_isstring(L,1) || (lua_gettop(L)>=2 && !lua_isnumber(L,2)) || (lua_gettop(L)>=3 && !lua_isstring(L,3)))
 	{
-		lua_pushstring(L,"RS232 Open arguments must be (string) port name, plus optional (number) baudrate, (string) mode");
+		lua_pushstring(L,"SerialPortOpen arguments must be (string) port name, plus optional (number) baudrate, (string) mode");
 		return lua_error(L);
 	}
 
@@ -58,24 +108,22 @@ int LuaRS232_Open(lua_State* L)
 	// returns -1 if invalid port name
 	if(portnumber<0)
 	{
-		lua_pushfstring(L,"RS232 Open received an invalid port name: \"%s\"",portname);
+		lua_pushfstring(L,"SerialPortOpen received an invalid port name: \"%s\"",portname);
 		return lua_error(L);
 	}
 
 
 	// Check the validity of mode
-	char databits = mode[0];
-	char parity   = mode[1];
-	char stopbit  = mode[2];
-
-	printf("Trying to open %s (%d) at %d bauds with %c data bits, %c parity, %c stop bits\n",portname,portnumber,baudrate,databits,parity,stopbit);
+	int databits = mode[0]-'0';
+	char parity  = mode[1];
+	int stopbits = mode[2]-'0';
 
 	if( (strlen(mode)!=3)
-		|| (databits!='8' && databits!='7' && databits!='6' && databits!='5')
+		|| (databits!=8 && databits!=7 && databits!=6 && databits!=5)
 		|| (parity!='N' && parity!='O' && parity!='E')
-		|| (stopbit!='1' && stopbit!='2') )
+		|| (stopbits!=1 && stopbits!=2) )
 	{
-		lua_pushfstring(L,"RS232 Open received an incorrect mode: \"%s\" does not match [5-8][NOE][12]",mode);
+		lua_pushfstring(L,"SerialPortOpen received an incorrect mode: \"%s\" does not match [5-8][NOE][12]",mode);
 		return lua_error(L);
 	}
 
@@ -83,41 +131,64 @@ int LuaRS232_Open(lua_State* L)
 	int err=RS232_OpenComport(portnumber,baudrate,mode);
 	if(err!=0)
 	{
-		lua_pushfstring(L,"RS232 Open %s (%d) failed with code %d",portname,portnumber,err);
+		lua_pushfstring(L,"SerialPortOpen(\"%s\",...) failed with code %d",portname,portnumber,err);
 		return lua_error(L);
 	}
 
-	currentportnumber=portnumber;
+	// Create a new table, that will be the comm object
+	lua_newtable(L);
 
+	// Add comm methods
+	luaL_setfuncs(L, SerialPortAPI, 0);
 
-	return 0;
+	// Add settings sub-table
+	lua_newtable(L);
+		lua_pushinteger(L,databits);
+		lua_setfield(L,-2,"databits");
+		lua_pushfstring(L,"%c",parity);
+		lua_setfield(L,-2,"parity");
+		lua_pushinteger(L,stopbits);
+		lua_setfield(L,-2,"stopbits");
+		lua_pushinteger(L,baudrate);
+		lua_setfield(L,-2,"baudrate");
+	lua_setfield(L,-2,"settings");
 
+	// Add internal sub-table
+	lua_newtable(L);
+		lua_pushinteger(L,portnumber);
+		lua_setfield(L,-2,"portnbr");
+	lua_setfield(L,-2,"internal");
+
+	// Add name
+	lua_pushstring (L,portname);
+	lua_setfield(L,-2,"name");
+
+	// Create a table that will be the metatable of the returned comm object
+	lua_newtable(L);
+	// Put into this table a new field, "_gc", with contains the function LuaRS232_Close
+	lua_pushcfunction(L,LuaRS232_Close);
+	lua_setfield(L,-2,"__gc");
+	// Set this table as the meta table of that table
+	lua_setmetatable(L,-2);
+
+	// Return only one thing, the serial comm object
+	return 1;
 }
 
 
 int LuaRS232_Close(lua_State* L)
 {
-	if(currentportnumber<0)
-	{
-		lua_pushstring(L,"RS232 Close error: No open port to close!");
-		return lua_error(L);
-	}
-	RS232_CloseComport(currentportnumber);
-	currentportnumber=-1;
+	printf("Closing RS-232 communication on \"%s\"\n",GetPortName(L));
+	RS232_CloseComport(GetPortNbr(L));
 	return 0;
 }
 
 int LuaRS232_Send(lua_State* L)
 {
-	// Check there's a port open
-	if(currentportnumber<0)
-	{
-		lua_pushstring(L,"RS232 Send error: No open port!");
-		return lua_error(L);
-	}
+	int port=GetPortNbr(L);
 
 	// Check argument
-	if(!lua_isstring(L,1))
+	if(!lua_isstring(L,2))
 	{
 		lua_pushstring(L,"RS232 Send error: Require a string as first parameter!");
 		return lua_error(L);
@@ -125,7 +196,7 @@ int LuaRS232_Send(lua_State* L)
 
 	// Retrieve data to send and its length from the Lua string passed as argument
 	size_t length;
-	unsigned char* message=(unsigned char*)lua_tolstring(L,1,&length);
+	unsigned char* message=(unsigned char*)lua_tolstring(L,2,&length);
 	if(length==0)
 	{
 		lua_pushstring(L,"RS232 Send error: I refuse to send a zero size string!");
@@ -133,7 +204,7 @@ int LuaRS232_Send(lua_State* L)
 	}
 
 	// Send and verify all the bytes were sent
-	int nbrbytessent=RS232_SendBuf(currentportnumber,message,length);
+	int nbrbytessent=RS232_SendBuf(port,message,length);
 	if(nbrbytessent!=length)
 	{
 		lua_pushfstring(L,"RS232 Send failed, only %d bytes out of %d sent",nbrbytessent,length);
@@ -147,12 +218,8 @@ int LuaRS232_Send(lua_State* L)
 
 int LuaRS232_Receive(lua_State* L)
 {
-	if(currentportnumber<0)
-	{
-		lua_pushstring(L,"RS232 Receive error: No open port!");
-		return lua_error(L);
-	}
-	int length=RS232_PollComport(currentportnumber,receptionbuffer,MAX_RECEIVE);
+	int port=GetPortNbr(L);
+	int length=RS232_PollComport(port,receptionbuffer,MAX_RECEIVE);
 	if(length==MAX_RECEIVE)
 	{
 		printf("RS232 Receive filled its %d bytes buffer!\n",length);
@@ -164,67 +231,43 @@ int LuaRS232_Receive(lua_State* L)
 
 int LuaRS232_EnableDTR(lua_State* L)
 {
-	if(currentportnumber<0)
-	{
-		lua_pushstring(L,"RS232 EnableDTR error: No open port!");
-		return lua_error(L);
-	}
-	RS232_enableDTR(currentportnumber);
+	RS232_enableDTR(GetPortNbr(L));
 	return 0;
 }
 
 
 int LuaRS232_DisableDTR(lua_State* L)
 {
-	if(currentportnumber<0)
-	{
-		lua_pushstring(L,"RS232 DisableDTR error: No open port!");
-		return lua_error(L);
-	}
-	RS232_disableDTR(currentportnumber);
+	RS232_disableDTR(GetPortNbr(L));
 	return 0;
 }
 
 
 int LuaRS232_EnableRTS(lua_State* L)
 {
-	if(currentportnumber<0)
-	{
-		lua_pushstring(L,"RS232 EnableRTS error: No open port!");
-		return lua_error(L);
-	}
-	RS232_enableRTS(currentportnumber);
+	RS232_enableRTS(GetPortNbr(L));
 	return 0;
 }
 
 
 int LuaRS232_DisableRTS(lua_State* L)
 {
-	if(currentportnumber<0)
-	{
-		lua_pushstring(L,"RS232 DisableRTS error: No open port!");
-		return lua_error(L);
-	}
-	 RS232_disableRTS(currentportnumber);
+	RS232_disableRTS(GetPortNbr(L));
 	return 0;
 }
 
 
 int LuaRS232_GetPinStatus(lua_State* L)
 {
-	if(currentportnumber<0)
-	{
-		lua_pushstring(L,"RS232 GetPinStatus error: No open port!");
-		return lua_error(L);
-	}
+	int port=GetPortNbr(L);
 	lua_newtable(L);
-	lua_pushboolean(L,RS232_IsDSREnabled(currentportnumber));
+	lua_pushboolean(L,RS232_IsDSREnabled(port));
 	lua_setfield(L,-2,"DSR");
-	lua_pushboolean(L,RS232_IsCTSEnabled(currentportnumber));
+	lua_pushboolean(L,RS232_IsCTSEnabled(port));
 	lua_setfield(L,-2,"CTS");
-	lua_pushboolean(L,RS232_IsDCDEnabled(currentportnumber));
+	lua_pushboolean(L,RS232_IsDCDEnabled(port));
 	lua_setfield(L,-2,"DSD");
-	lua_pushboolean(L,RS232_IsDSREnabled(currentportnumber));
+	lua_pushboolean(L,RS232_IsDSREnabled(port));
 	lua_setfield(L,-2,"CTS");
 	return 1;
 }
@@ -232,37 +275,29 @@ int LuaRS232_GetPinStatus(lua_State* L)
 
 int LuaRS232_FlushRX(lua_State* L)
 {
-	if(currentportnumber<0)
-	{
-		lua_pushstring(L,"RS232 LuaRS232_FlushRX error: No open port!");
-		return lua_error(L);
-	}
-	RS232_flushRX(currentportnumber);
+	RS232_flushRX(GetPortNbr(L));
 	return 0;
 }
 
 
 int LuaRS232_FlushTX(lua_State* L)
 {
-	if(currentportnumber<0)
-	{
-		lua_pushstring(L,"RS232 LuaRS232_FlushTX error: No open port!");
-		return lua_error(L);
-	}
-	RS232_flushTX(currentportnumber);
+	RS232_flushTX(GetPortNbr(L));
 	return 0;
 }
 
 
 int LuaRS232_FlushRXTX(lua_State* L)
 {
-	if(currentportnumber<0)
-	{
-		lua_pushstring(L,"RS232 LuaRS232_LuaRS232_FlushRXTX error: No open port!");
-		return lua_error(L);
-	}
-	RS232_flushRXTX(currentportnumber);
+	RS232_flushRXTX(GetPortNbr(L));
 	return 0;
+}
+
+int LuaRS232_Sleep(lua_State* L)
+{
+	lua_remove(L,1);
+	LuaSleep(L);
+	return 1;
 }
 
 

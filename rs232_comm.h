@@ -21,5 +21,7 @@ extern int LuaRS232_FlushRX(lua_State* L);
 extern int LuaRS232_FlushTX(lua_State* L);
 extern int LuaRS232_FlushRXTX(lua_State* L);
 
+extern int LuaRS232_Sleep(lua_State* L);
+
 
 #endif
