@@ -1,6 +1,8 @@
 
-
-
+-- Program to print content of LuaRS232 and LuaRS232.SerialPortOpen(...)
+-- Example usage:
+-- lua-5.3.1\bin\lua53.exe PrintInterfaceInfo.lua COM12
+local PortName=...
 
 -- Function to format the content of a nested table into printable form
 -- Properly handle recursive tables!
@@ -90,7 +92,7 @@ print("")
 print("LuaRS232 = "..tostring(LuaRS232))
 print("")
 print("")
-local UART=LuaRS232.SerialPortOpen("COM5")
+local UART=LuaRS232.SerialPortOpen(PortName)
 print("LuaRS232.SerialPortOpen(...) = "..tostring(UART))
 print("")
 print("")

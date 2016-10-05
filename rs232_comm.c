@@ -80,7 +80,7 @@ int LuaRS232_Open(lua_State* L)
 	// Check that function was called with parameters of proper types
 	if(lua_gettop(L)<1 || !lua_isstring(L,1) || (lua_gettop(L)>=2 && !lua_isnumber(L,2)) || (lua_gettop(L)>=3 && !lua_isstring(L,3)))
 	{
-		lua_pushstring(L,"SerialPortOpen arguments must be (string) port name, plus optional (number) baudrate, (string) mode");
+		lua_pushstring(L,"RS232 Open arguments must be (string) port name, plus optional (number) baudrate, (string) mode");
 		return lua_error(L);
 	}
 
@@ -89,7 +89,7 @@ int LuaRS232_Open(lua_State* L)
 	const int   baudrate = lua_gettop(L)>=2 ? lua_tonumber(L,2) : 115200;
 	const char* mode     = lua_gettop(L)>=3 ? lua_tostring(L,3) : "8N1";
 
-	// RS232_GetPortnr converts a port name into a port number
+	// RS232_GetPortNbr converts a port name into a port number
 	/*
        +-------------+-------+---------+
        | Port Number | Linux | Windows |
@@ -104,11 +104,12 @@ int LuaRS232_Open(lua_State* L)
    this lib internal numbering start at 0.
 	*/
 
-	int portnumber=RS232_GetPortnr(portname);
+	int portnumber;
+	char* error=RS232_GetPortNbr(portname,&portnumber);
 	// returns -1 if invalid port name
-	if(portnumber<0)
+	if(error)
 	{
-		lua_pushfstring(L,"SerialPortOpen received an invalid port name: \"%s\"",portname);
+		lua_pushfstring(L,"RS232 Open received an invalid port name: \"%s\" %s",portname,error);
 		return lua_error(L);
 	}
 
@@ -123,15 +124,15 @@ int LuaRS232_Open(lua_State* L)
 		|| (parity!='N' && parity!='O' && parity!='E')
 		|| (stopbits!=1 && stopbits!=2) )
 	{
-		lua_pushfstring(L,"SerialPortOpen received an incorrect mode: \"%s\" does not match [5-8][NOE][12]",mode);
+		lua_pushfstring(L,"RS232 Open received an incorrect mode: \"%s\" does not match [5-8][NOE][12]",mode);
 		return lua_error(L);
 	}
 
 
-	int err=RS232_OpenComport(portnumber,baudrate,mode);
-	if(err!=0)
+	error=RS232_OpenPort(portnumber,baudrate,mode);
+	if(error!=0)
 	{
-		lua_pushfstring(L,"SerialPortOpen(\"%s\",...) failed with code %d",portname,portnumber,err);
+		lua_pushfstring(L,"RS232 Open (\"%s\",%d,%s) failed: %s",portname,baudrate,mode,error);
 		return lua_error(L);
 	}
 
@@ -179,7 +180,12 @@ int LuaRS232_Open(lua_State* L)
 int LuaRS232_Close(lua_State* L)
 {
 	printf("Closing RS-232 communication on \"%s\"\n",GetPortName(L));
-	RS232_CloseComport(GetPortNbr(L));
+	char* error=RS232_ClosePort(GetPortNbr(L));
+	if(error!=0)
+	{
+		lua_pushfstring(L,"RS232 Close failed: %s",error);
+		return lua_error(L);
+	}
 	return 0;
 }
 
@@ -204,7 +210,14 @@ int LuaRS232_Send(lua_State* L)
 	}
 
 	// Send and verify all the bytes were sent
-	int nbrbytessent=RS232_SendBuf(port,message,length);
+	int nbrbytessent;
+	char* error=RS232_SendBuffer(port,message,length,&nbrbytessent);
+	if(error)
+	{
+		lua_pushfstring(L,"RS232 Send error: %s",error);
+		return lua_error(L);
+	}
+
 	if(nbrbytessent!=length)
 	{
 		lua_pushfstring(L,"RS232 Send failed, only %d bytes out of %d sent",nbrbytessent,length);
@@ -219,7 +232,14 @@ int LuaRS232_Send(lua_State* L)
 int LuaRS232_Receive(lua_State* L)
 {
 	int port=GetPortNbr(L);
-	int length=RS232_PollComport(port,receptionbuffer,MAX_RECEIVE);
+
+	int length;
+	char* error=RS232_ReadBuffer(port,receptionbuffer,MAX_RECEIVE,&length);
+	if(error)
+	{
+		lua_pushfstring(L,"RS232 Receive error: %s",error);
+		return lua_error(L);
+	}
 	if(length==MAX_RECEIVE)
 	{
 		printf("RS232 Receive filled its %d bytes buffer!\n",length);
@@ -231,28 +251,28 @@ int LuaRS232_Receive(lua_State* L)
 
 int LuaRS232_EnableDTR(lua_State* L)
 {
-	RS232_enableDTR(GetPortNbr(L));
+	RS232_EnableDTR(GetPortNbr(L));
 	return 0;
 }
 
 
 int LuaRS232_DisableDTR(lua_State* L)
 {
-	RS232_disableDTR(GetPortNbr(L));
+	RS232_DisableDTR(GetPortNbr(L));
 	return 0;
 }
 
 
 int LuaRS232_EnableRTS(lua_State* L)
 {
-	RS232_enableRTS(GetPortNbr(L));
+	RS232_EnableRTS(GetPortNbr(L));
 	return 0;
 }
 
 
 int LuaRS232_DisableRTS(lua_State* L)
 {
-	RS232_disableRTS(GetPortNbr(L));
+	RS232_DisableRTS(GetPortNbr(L));
 	return 0;
 }
 
@@ -275,23 +295,26 @@ int LuaRS232_GetPinStatus(lua_State* L)
 
 int LuaRS232_FlushRX(lua_State* L)
 {
-	RS232_flushRX(GetPortNbr(L));
+	RS232_FlushRX(GetPortNbr(L));
 	return 0;
 }
 
 
 int LuaRS232_FlushTX(lua_State* L)
 {
-	RS232_flushTX(GetPortNbr(L));
+	RS232_FlushTX(GetPortNbr(L));
 	return 0;
 }
 
 
 int LuaRS232_FlushRXTX(lua_State* L)
 {
-	RS232_flushRXTX(GetPortNbr(L));
+	int port=GetPortNbr(L);
+	RS232_FlushRX(port);
+	RS232_FlushTX(port);
 	return 0;
 }
+
 
 int LuaRS232_Sleep(lua_State* L)
 {

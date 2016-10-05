@@ -151,7 +151,7 @@
   </li>
 </ul>
 
-<h1>RS-232 for Linux, FreeBSD and windows</h1>
+<h1>RS-232 for Linux, FreeBSD and Windows</h1>
 
 <p>
     Here you can find code to use the serial port.<br>
@@ -171,7 +171,14 @@
 
 <p>
     This is free software, it is experimental and available under the GPL License version 3.<br>
-    Despite this software is intend to be usefull, there is no warranty, use this software at your own risk.
+    Despite this software being intended to be useful, there is no warranty. Use this software at your own risk.
+</p>
+
+<p>
+    <b><big>October 05, 2016 new version by SG:</big></b><br>
+    - changed functions name and signature.<br>
+    - return error strings instead of printing them.<br>
+    - linux half untested so probably broken.<br>
 </p>
 
 <p>
@@ -235,7 +242,7 @@ RS232_IsDSREnabled()<br>
 <br>
 </p>
 
-<h3>The sourcecode</h3>
+<h3>The original source code</h3>
 <ul>
     <li class="normal"><a href="http://www.teuniz.net/RS-232/RS-232.tar.gz">RS-232.tar.gz</a></li>
 </ul>
@@ -249,78 +256,87 @@ RS232_IsDSREnabled()<br>
 <h3>Functions</h3>
 
 <p>
-    <var><a style="color: maroon">int</a></var> RS232_OpenComport(<var><a style="color: maroon">int</a> comport_number, <a style="color: maroon">int</a> baudrate, <a style="color: maroon">const char *</a> mode</var>)<br><br>
-        &nbsp;&nbsp;Opens the comport, comportnumber starts with 0 (see the list of numbers).<br>
+    <var><a style="color: maroon">char*</a></var> RS232_OpenPort(<var><a style="color: maroon">const int</a> port_number, <a style="color: maroon">const int</a> baudrate, <a style="color: maroon">const char *</a> mode</var>)<br><br>
+        &nbsp;&nbsp;Opens a comport, PortNbr starts with 0 (see the list of numbers).<br>
         &nbsp;&nbsp;Baudrate is expressed in baud per second i.e 115200 (see the list of possible baudrates).<br>
         &nbsp;&nbsp;Mode is a string in the form of "8N1", "7E2", etc.<br>
         &nbsp;&nbsp;8N1 means eight databits, no parity, one stopbit. If in doubt, use 8N1 (see the list of possible modes).<br>
-        &nbsp;&nbsp;Returns 1 in case of an error.<br><br>
+        &nbsp;&nbsp;Returns an error string in case of an error, null pointer if no error.<br>
+        &nbsp;&nbsp;In case the comport is already opened (by another process),<br>
+        &nbsp;&nbsp;it will not open the port but raise an error instead.<br><br><br>
 
-    <var><a style="color: maroon">int</a></var> RS232_PollComport(<var><a style="color: maroon">int</a> comport_number, <a style="color: maroon">unsigned char</a> *buf, <a style="color: maroon">int</a> size</var>)<br><br>
-        &nbsp;&nbsp;Gets characters from the serial port (if any). Buf is a pointer to a buffer<br>
-        &nbsp;&nbsp;and size the size of the buffer in bytes.<br>
-        &nbsp;&nbsp;Returns the amount of received characters into the buffer.<br>
-        &nbsp;&nbsp;After succesfully opening the COM-port, connect this function to a timer.<br>
-        &nbsp;&nbsp;The timer should have an interval of approx. 100 milliSeconds.<br>
-        &nbsp;&nbsp;Do not forget to stop the timer before closing the COM-port.<br><br>
+    <var><a style="color: maroon">char*</a></var> RS232_ReadBuffer(<var><a style="color: maroon">const int</a> port_number, <a style="color: maroon">unsigned char *</a> buffer, <a style="color: maroon">const int</a> maxsize, <a style="color: maroon">int *</a> usedsize</var>)<br><br>
+        &nbsp;&nbsp;Gets characters from the serial port (if any).
+        &nbsp;&nbsp;Takes buffer, a pointer to a buffer,<br>
+        &nbsp;&nbsp;and maxsize the size of the buffer in bytes.<br>
+        &nbsp;&nbsp;Fills the buffer and gives in usedsize the amount of received characters into the buffer.<br>
+        &nbsp;&nbsp;Returns an error string in case of an error, null pointer if no error.<br>
+        &nbsp;&nbsp;After successfully opening the COM-port, connect this function to a timer.<br>
+        &nbsp;&nbsp;The timer should have an interval of approx. 20 to 100 milliSeconds.<br>
+        &nbsp;&nbsp;Do not forget to stop the timer before closing the COM-port.<br>
+        &nbsp;&nbsp;Always check the ActualSize! It tells you how many bytes<br>
+        &nbsp;&nbsp;are actually received and present in your buffer!<br><br><br>
 
-    <var><a style="color: maroon">int</a></var> RS232_SendByte(<var><a style="color: maroon">int</a> comport_number, <a style="color: maroon">unsigned char</a> byte</var>)<br>
-        &nbsp;&nbsp;Sends a byte via the serial port. Returns 1 in case of an error.<br><br>
+    <var><a style="color: maroon">int</a></var> RS232_SendByte(<var><a style="color: maroon">const int</a> port_number, <a style="color: maroon">const unsigned char</a> byte</var>)<br><br>
+        &nbsp;&nbsp;Sends a byte via the serial port.<br>
+        &nbsp;&nbsp;Returns an error string in case of an error, null pointer if no error.<br><br><br>
 
-    <var><a style="color: maroon">int</a></var> RS232_SendBuf(<var><a style="color: maroon">int</a> comport_number, <a style="color: maroon">unsigned char</a> *buf, <a style="color: maroon">int</a> size</var>)<br><br>
-        &nbsp;&nbsp;Sends multiple bytes via the serial port. Buf is a pointer to a buffer<br>
-        &nbsp;&nbsp;and size the size of the buffer in bytes.<br>
-        &nbsp;&nbsp;Returns -1 in case of an error, otherwise it returns the amount of bytes sent.<br>
-        &nbsp;&nbsp;This function blocks (it returns after all the bytes have been processed).<br><br>
+    <var><a style="color: maroon">int</a></var> RS232_SendBuffer(<var><a style="color: maroon">const int</a> port_number, <a style="color: maroon">unsigned char *</a> buffer, <a style="color: maroon">int</a> size,<a style="color: maroon">int *</a> sent</var>)<br><br>
+        &nbsp;&nbsp;Sends multiple bytes via the serial port, buffer is a pointer to a buffer<br>
+        &nbsp;&nbsp;and size the size of the buffer in bytes,<br>
+        &nbsp;&nbsp;while sent is how many bytes were actually sent.<br>
+        &nbsp;&nbsp;Returns an error string in case of an error, null pointer if no error.<br>
+        &nbsp;&nbsp;This function blocks (it returns after all the bytes have been processed).<br><br><br>
 
-    <var><a style="color: maroon">void</a></var> RS232_CloseComport(<var><a style="color: maroon">int</a> comport_number</var>)<br><br>
-        &nbsp;&nbsp;Closes the serial port.<br><br>
+    <var><a style="color: maroon">void</a></var> RS232_ClosePort(<var><a style="color: maroon">const int</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Closes the serial port.<br>
+        &nbsp;&nbsp;Returns an error string in case of an error, null pointer if no error.<br><br><br>
 
-    <var><a style="color: maroon">void</a></var> RS232_cputs(<var><a style="color: maroon">int</a> comport_number, <a style="color: maroon">const char</a> *text</var>)<br><br>
-        &nbsp;&nbsp;Sends a string via the serial port. String must be null-terminated.<br><br>
+    <var><a style="color: maroon">char*</a></var> RS232_SendText(<var><a style="color: maroon">const int</a> port_number, <a style="color: maroon">const char *</a> text</var>)<br><br>
+        &nbsp;&nbsp;Sends a null-terminated string via the serial port.<br>
+        &nbsp;&nbsp;Returns an error string in case of an error, null pointer if no error.<br><br><br>
 
-    <var><a style="color: maroon">int</a></var> RS232_GetPortnr(<var><a style="color: maroon">const char</a> *device</var>)<br><br>
-        &nbsp;&nbsp;Returns the comport number based on the device name 
-e.g. "ttyS0" or "COM1". (Doesn't mean the device actually exists!)<br>
-        &nbsp;&nbsp;Returns -1 when not found.<br><br>
+    <var><a style="color: maroon">char *</a></var> RS232_GetPortNbr(<var><a style="color: maroon">const char *</a> device_name, <a style="color: maroon">int *</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Takes a first argument a device name, for example "ttyS0" or "COM1".<br>
+        &nbsp;&nbsp;Gives into second argument the matching com port number.<br>
+        &nbsp;&nbsp;Doesn't mean the device actually exists!<br>
+        &nbsp;&nbsp;Returns an error string in case of an error, null pointer if no error.<br><br><br>
 
     The following functions are normally not needed but can be used to set or check the status of the control-lines:<br><br>
 
-    <var><a style="color: maroon">void</a></var> RS232_enableDTR(<var><a style="color: maroon">int</a> comport_number</var>)<br><br>
-        &nbsp;&nbsp;Sets the DTR line high (active state).<br><br>
+    <var><a style="color: maroon">void</a></var> RS232_EnableDTR(<var><a style="color: maroon">const int</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Sets the DTR line high (active state).<br><br><br>
 
-    <var><a style="color: maroon">void</a></var> RS232_disableDTR(<var><a style="color: maroon">int</a> comport_number</var>)<br><br>
-        &nbsp;&nbsp;Sets the DTR line low (non active state).<br><br>
+    <var><a style="color: maroon">void</a></var> RS232_DisableDTR(<var><a style="color: maroon">const int</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Sets the DTR line low (non active state).<br><br><br>
 
-    <var><a style="color: maroon">void</a></var> RS232_enableRTS(<var><a style="color: maroon">int</a> comport_number</var>)<br><br>
-        &nbsp;&nbsp;Sets the RTS line high (active state).<br><br>
+    <var><a style="color: maroon">void</a></var> RS232_EnableRTS(<var><a style="color: maroon">const int</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Sets the RTS line high (active state).<br><br><br>
 
-    <var><a style="color: maroon">void</a></var> RS232_disableRTS(<var><a style="color: maroon">int</a> comport_number</var>)<br><br>
-        &nbsp;&nbsp;Sets the RTS line low (non active state).<br><br>
+    <var><a style="color: maroon">void</a></var> RS232_DisableRTS(<var><a style="color: maroon">const int</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Sets the RTS line low (non active state).<br><br><br>
 
-    <var><a style="color: maroon">int</a></var> RS232_IsDSREnabled(<var><a style="color: maroon">int</a> comport_number</var>)<br><br>
-    &nbsp;&nbsp;Checks the status of the DSR-pin. Returns 1 when the the DSR line is high (active state), otherwise 0.<br><br>
+    <var><a style="color: maroon">int</a></var> RS232_IsDSREnabled(<var><a style="color: maroon">const int</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Checks the status of the DSR-pin. Returns 1 when the the DSR line is high (active state), otherwise 0.<br><br><br>
 
-    <var><a style="color: maroon">int</a></var> RS232_IsCTSEnabled(<var><a style="color: maroon">int</a> comport_number</var>)<br><br>
-    &nbsp;&nbsp;Checks the status of the CTS-pin. Returns 1 when the the CTS line is high (active state), otherwise 0.<br><br>
+    <var><a style="color: maroon">int</a></var> RS232_IsCTSEnabled(<var><a style="color: maroon">const int</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Checks the status of the CTS-pin. Returns 1 when the the CTS line is high (active state), otherwise 0.<br><br><br>
 
-    <var><a style="color: maroon">int</a></var> RS232_IsDCDEnabled(<var><a style="color: maroon">int</a> comport_number</var>)<br><br>
-    &nbsp;&nbsp;Checks the status of the DCD-pin. Returns 1 when the the DCD line is high (active state), otherwise 0.<br><br>
+    <var><a style="color: maroon">int</a></var> RS232_IsDCDEnabled(<var><a style="color: maroon">const int</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Checks the status of the DCD-pin. Returns 1 when the the DCD line is high (active state), otherwise 0.<br>
+        &nbsp;&nbsp;The following functions are normally not needed but can be used to empty the rx/tx buffers:<br>
+        &nbsp;&nbsp;("discards data written to the serial port but not transmitted, or data received but not read")<br><br><br>
 
-    The following functions are normally not needed but can be used to empty the rx/tx buffers:<br>
-    ("discards data written to the serial port but not transmitted, or data received but not read")<br><br>
+    <var><a style="color: maroon">void</a></var> RS232_FlushRX(<var><a style="color: maroon">const int</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Flushes data received but not read.<br><br><br>
 
-    <var><a style="color: maroon">void</a></var> RS232_flushRX(<var><a style="color: maroon">int</a> comport_number</var>)<br><br>
+    <var><a style="color: maroon">void</a></var> RS232_FlushTX(<var><a style="color: maroon">const int</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Flushes data written but not transmitted.<br><br><br>
 
-    &nbsp;&nbsp;Flushes data received but not read.<br><br>
+    <var><a style="color: maroon">void</a></var> RS232_FlushRXTX(<var><a style="color: maroon">const int</a> port_number</var>)<br><br>
+        &nbsp;&nbsp;Flushes both data received but not read, and data written but not transmitted.<br>
+        &nbsp;&nbsp;May be removed, just use both RS232_FlushRX and RS232_FlushTX.<br><br><br>
 
-    <var><a style="color: maroon">void</a></var> RS232_flushTX(<var><a style="color: maroon">int</a> comport_number</var>)<br><br>
-
-    &nbsp;&nbsp;Flushes data written but not transmitted.<br><br>
-
-    <var><a style="color: maroon">void</a></var> RS232_flushRXTX(<var><a style="color: maroon">int</a> comport_number</var>)<br><br>
-
-    &nbsp;&nbsp;Flushes both data received but not read, and data written but not transmitted.<br><br>
 </p>
 
 <p><br></p>
@@ -328,174 +344,22 @@ e.g. "ttyS0" or "COM1". (Doesn't mean the device actually exists!)<br>
 <h3>Notes:</h3>
 
 <p>
-    You don't need to call RS232_PollComport() when you only want to send characters.<br>
-    Sending and receiving do not influence eachother.<br>
+    You don't need to poll port when you only want to send characters.<br>
+    Sending and receiving do not influence each other.<br>
 <br>
     The os (kernel) has an internal buffer of 4096 bytes.<br>
     If this buffer is full and a new character arrives on the serial port,<br>
     the oldest character in the buffer will be overwritten and thus will be lost.<br>
 <br>
-    After a successfull call to RS232_OpenComport(), the os will start to buffer incoming characters.<br>
+    After a successful call to RS232_OpenPort(...), the os will start to buffer incoming characters.<br>
 <br>
-    Do not use microsoft tools to compile this library.<br>
-    The microsoft C-compiler is an old and retarded compiler that does not even support ANSI C99.<br>
+    Do not use Microsoft tools to compile this library.<br>
+    The Microsoft C-compiler is an old and retarded compiler that does not even support ANSI C99.<br>
 <br>
 </p>
 
-<h3>Demo:</h3>
-
 <p>
-    Example code that demonstrates how to use the library to receive characters and print them to the screen:
-</p>
-<pre class="code">
-/**************************************************
-
-file: demo_rx.c
-purpose: simple demo that receives characters from
-the serial port and print them on the screen,
-exit the program by pressing Ctrl-C
-
-compile with the command: gcc demo_rx.c rs232.c -Wall -Wextra -o2 -o test_rx
-
-**************************************************/
-
-#include &lt;stdlib.h&gt;
-#include &lt;stdio.h&gt;
-
-#ifdef _WIN32
-#include &lt;Windows.h&gt;
-#else
-#include &lt;unistd.h&gt;
-#endif
-
-#include "rs232.h"
-
-
-
-int main()
-{
-  int i, n,
-      cport_nr=0,        /* /dev/ttyS0 (COM1 on windows) */
-      bdrate=9600;       /* 9600 baud */
-
-  unsigned char buf[4096];
-
-  char mode[]={'8','N','1',0};
-
-
-  if(RS232_OpenComport(cport_nr, bdrate, mode))
-  {
-    printf("Can not open comport\n");
-
-    return(0);
-  }
-
-  while(1)
-  {
-    n = RS232_PollComport(cport_nr, buf, 4095);
-
-    if(n &gt; 0)
-    {
-      buf[n] = 0;   /* always put a "null" at the end of a string! */
-
-      for(i=0; i &lt; n; i++)
-      {
-        if(buf[i] &lt; 32)  /* replace unreadable control-codes by dots */
-        {
-          buf[i] = '.';
-        }
-      }
-
-      printf("received %i bytes: %s\n", n, (char *)buf);
-    }
-
-#ifdef _WIN32
-    Sleep(100);
-#else
-    usleep(100000);  /* sleep for 100 milliSeconds */
-#endif
-  }
-
-  return(0);
-}
-
-</pre>
-
-<p>
-    Example code that demonstrates how to use the library to transmit characters and print them to the screen:
-</p>
-
-<pre class="code">
-/**************************************************
-
-file: demo_tx.c
-purpose: simple demo that transmits characters to
-the serial port and print them on the screen,
-exit the program by pressing Ctrl-C
-
-compile with the command: gcc demo_tx.c rs232.c -Wall -Wextra -o2 -o test_tx
-
-**************************************************/
-
-#include &lt;stdlib.h&gt;
-#include &lt;stdio.h&gt;
-
-#ifdef _WIN32
-#include &lt;Windows.h&gt;
-#else
-#include &lt;unistd.h&gt;
-#endif
-
-#include "rs232.h"
-
-
-
-int main()
-{
-  int i=0,
-      cport_nr=0,        /* /dev/ttyS0 (COM1 on windows) */
-      bdrate=9600;       /* 9600 baud */
-
-  char mode[]={'8','N','1',0},
-       str[2][512];
-
-
-  strcpy(str[0], "The quick brown fox jumped over the lazy grey dog.\n");
-
-  strcpy(str[1], "Happy serial programming!.\n");
-
-
-  if(RS232_OpenComport(cport_nr, bdrate, mode))
-  {
-    printf("Can not open comport\n");
-
-    return(0);
-  }
-
-  while(1)
-  {
-    RS232_cputs(cport_nr, str[i]);
-
-    printf("sent: %s\n", str[i]);
-
-#ifdef _WIN32
-    Sleep(1000);
-#else
-    usleep(1000000);  /* sleep for 1 Second */
-#endif
-
-    i++;
-
-    i %= 2;
-  }
-
-  return(0);
-}
-
-</pre>
-
-<p>
-    <br><b><big>tip:</big></b> To get access to the serial port on Linux, you need to be a member of the group "dialout".<br>
+    <br><b><big>Tip:</big></b> To get access to the serial port on Linux, you need to be a member of the group "dialout".<br>
 <br>
     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Look <a href="http://www.teuniz.net/Timer_code/index.html">here</a> for a <a href="http://www.teuniz.net/Timer_code/index.html">timer library</a>.
 <br>

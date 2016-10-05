@@ -17,6 +17,7 @@ REM Delete useless temp files
 del *.o *.a
 
 REM Test the .dll
-%LUA53%\bin\lua53.exe PrintInterfaceInfo.lua || exit /b 1
-%LUA53%\bin\lua53.exe TestRS232.lua || exit /b 1
+set PORTNAME=COM12
+%LUA53%\bin\lua53.exe PrintInterfaceInfo.lua %PORTNAME% || exit /b 1
+%LUA53%\bin\lua53.exe TestRS232.lua %PORTNAME% || exit /b 1
 

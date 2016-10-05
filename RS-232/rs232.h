@@ -25,9 +25,11 @@
 ***************************************************************************
 */
 
-/* Last revision: July 10, 2016 */
-
 /* For more info and how to use this library, visit: http://www.teuniz.net/RS-232/ */
+/* Modified by SG from original, mostly to return error strings instead of printing them */
+
+/* Last revision by Teuniz: July 10, 2016 */
+/* Last revision by SG: October 05, 2016 */
 
 
 #ifndef rs232_INCLUDED
@@ -60,23 +62,29 @@ extern "C" {
 
 #endif
 
-int RS232_OpenComport(int, int, const char *);
-int RS232_PollComport(int, unsigned char *, int);
-int RS232_SendByte(int, unsigned char);
-int RS232_SendBuf(int, unsigned char *, int);
-void RS232_CloseComport(int);
-void RS232_cputs(int, const char *);
+/* First parameter is Port Number, (except for first function) */
+/* Return value error message in case of error, or null pointer if ok */
+char* RS232_GetPortNbr(const char* inPortName, int* outPortNbr);
+char* RS232_OpenPort(const int inPortNbr, const int inBaudRate, const char* inMode);
+char* RS232_ClosePort(const int inPortNbr);
+char* RS232_SendByte(const int inPortNbr, const unsigned char inByte);
+char* RS232_SendBuffer(const int inPortNbr, const unsigned char* inBuffer, const int inSize, int* outSent);
+char* RS232_SendText(const int inPortNbr, const char* inText);
+char* RS232_ReadBuffer(const int inPortNbr, unsigned char* outBuffer, const int inMaxWantedSize, int* outActualSize);
+
+// Return the value, no error possible
 int RS232_IsDCDEnabled(int);
 int RS232_IsCTSEnabled(int);
 int RS232_IsDSREnabled(int);
-void RS232_enableDTR(int);
-void RS232_disableDTR(int);
-void RS232_enableRTS(int);
-void RS232_disableRTS(int);
-void RS232_flushRX(int);
-void RS232_flushTX(int);
-void RS232_flushRXTX(int);
-int RS232_GetPortnr(const char *);
+
+// Do the action, no error possible
+void RS232_EnableDTR(int);
+void RS232_DisableDTR(int);
+void RS232_EnableRTS(int);
+void RS232_DisableRTS(int);
+void RS232_FlushRX(int);
+void RS232_FlushTX(int);
+
 
 #ifdef __cplusplus
 } /* extern "C" */

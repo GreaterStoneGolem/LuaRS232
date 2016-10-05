@@ -5,85 +5,96 @@ Url:     http://www.teuniz.net/RS-232/
 E-mail:  teuniz@gmail.com
 License: GPLv3
 
-Last revision: July 10, 2016
+Last revision by Teunis: July 10, 2016
+Last revision by SG: October 05, 2016
 
 
+char* RS232_OpenPort(const int PortNbr, const int Baudrate, const char* Mode)
 
-int RS232_OpenComport(int comport_number, int baudrate, const char * mode)
-
-  Opens the comport, comportnumber starts with 0 (see the list of numbers).
+  Opens a comport, PortNbr starts with 0 (see the list of numbers).
   Baudrate is expressed in baud per second i.e 115200 (see the list of possible baudrates).
   Mode is a string in the form of "8N1", "7E2", etc.
   8N1 means eight databits, no parity, one stopbit. If in doubt, use 8N1 (see the list of possible modes).
-  Returns 1 in case of an error.
+  Returns an error string in case of an error, null pointer if no error.
   In case the comport is already opened (by another process),
   it will not open the port but raise an error instead.
 
-int RS232_PollComport(int comport_number, unsigned char *buf, int size)
 
-  Gets characters from the serial port (if any). Buf is a pointer to a buffer
-  and size the size of the buffer in bytes.
-  Returns the amount of received characters into the buffer.
-  After succesfully opening the COM-port, connect this function to a timer.
+char* RS232_ReadBuffer(const int PortNbr, unsigned char* Buffer, const int MaxWantedSize, int* ActualSize)
+
+  Gets characters from the serial port (if any). Buffer is a pointer to a buffer
+  and MaxWantedSize the size of the buffer in bytes.
+  ActualSize is the amount of received characters into the buffer.
+  Returns an error string in case of an error, null pointer if no error.
+  After successfully opening the COM-port, connect this function to a timer.
   The timer should have an interval of approx. 20 to 100 milliSeconds.
   Do not forget to stop the timer before closing the COM-port.
-  Allways check the return value! The return value tells you how many bytes
+  Always check the ActualSize! It tells you how many bytes
   are actually received and present in your buffer!
 
-int RS232_SendByte(int comport_number, unsigned char byte)
 
-  Sends a byte via the serial port. Returns 1 in case of an error.
+char* RS232_SendByte(const int PortNbr, const unsigned char Byte)
 
-int RS232_SendBuf(int comport_number, unsigned char *buf, int size)
+  Sends a byte via the serial port. Returns an error string in case of an error, null pointer if no error.
 
-  Sends multiple bytes via the serial port. Buf is a pointer to a buffer
-  and size the size of the buffer in bytes.
-  Returns -1 in case of an error, otherwise it returns the amount of bytes sent.
+
+char* RS232_SendBuffer(const int PortNbr, const unsigned char* Buffer, const int Size, int* Sent)
+
+  Sends multiple bytes via the serial port. Buffer is a pointer to a buffer
+  and Size the size of the buffer in bytes.
+  Sent is how many bytes were actually sent.
+  Returns an error string in case of an error, null pointer if no error.
   This function blocks (it returns after all the bytes have been processed).
 
-void RS232_CloseComport(int comport_number)
+
+char* RS232_ClosePort(const int PortNbr)
 
   Closes the serial port.
+  Returns an error string in case of an error, null pointer if no error.
 
-void RS232_cputs(int comport_number, const char *text)
 
-  Sends a string via the serial port. String must be null-terminated.
+char* RS232_SendText(const int PortNbr, const char* Text)
 
-int RS232_GetPortnr(const char *devname)
+  Sends a null-terminated string via the serial port.
+  Returns an error string in case of an error, null pointer if no error.
 
-  Returns the comport number based on the device name e.g. "ttyS0" or "COM1".
-  (Doesn't mean the device actually exists!)
-  Returns -1 when not found.
+
+char* RS232_GetPortNbr(const char* PortName, int* PortNbr);
+
+  Takes a first argument a device name, for example "ttyS0" or "COM1".
+  Gives into second argument the matching com port number.
+  Doesn't mean the device actually exists!
+  Returns an error string in case of an error, null pointer if no error.
 
 
 The following functions are normally not needed but can be used to set or check the status of the control-lines:
 ================================================================================================================
 
-void RS232_enableDTR(int comport_number)
+void RS232_EnableDTR(int PortNbr)
 
   Sets the DTR line high (active state).
 
-void RS232_disableDTR(int comport_number)
+void RS232_DisableDTR(int PortNbr)
 
   Sets the DTR line low (non active state).
 
-void RS232_enableRTS(int comport_number)
+void RS232_EnableRTS(int PortNbr)
 
   Sets the RTS line high (active state).
 
-void RS232_disableRTS(int comport_number)
+void RS232_DisableRTS(int PortNbr)
 
   Sets the RTS line low (non active state).
 
-int RS232_IsDSREnabled(int comport_number)
+int RS232_IsDSREnabled(int PortNbr)
 
   Checks the status of the DSR-pin. Returns 1 when the the DSR line is high (active state), otherwise 0.
 
-int RS232_IsCTSEnabled(int comport_number)
+int RS232_IsCTSEnabled(int PortNbr)
 
   Checks the status of the CTS-pin. Returns 1 when the the CTS line is high (active state), otherwise 0.
 
-int RS232_IsDCDEnabled(int comport_number)
+int RS232_IsDCDEnabled(int PortNbr)
 
   Checks the status of the DCD-pin. Returns 1 when the the DCD line is high (active state), otherwise 0.
 
@@ -93,36 +104,37 @@ The following functions are normally not needed but can be used to empty the rx/
 
 ("discards data written to the serial port but not transmitted, or data received but not read")
 
-void RS232_flushRX(int comport_number)
+void RS232_FlushRX(int comport_number)
 
   Flushes data received but not read.
 
-void RS232_flushTX(int comport_number)
+void RS232_FlushTX(int comport_number)
 
   Flushes data written but not transmitted.
 
-void RS232_flushRXTX(int comport_number)
+void RS232_FlushRXTX(int comport_number)
 
   Flushes both data received but not read, and data written but not transmitted.
+  May be removed, just use both RS232_FlushRX and RS232_FlushTX.
 
 
 
 Notes:
 
-You don't need to call RS232_PollComport() when you only want to send characters.
-Sending and receiving do not influence eachother.
+You don't need to poll port when you only want to send characters.
+Sending and receiving do not influence each other.
 
 The os (kernel) has an internal buffer of 4096 bytes (for traditional onboard serial ports).
 USB/Serial-converter drivers use much bigger buffers (multiples of 4096).
 If this buffer is full and a new character arrives on the serial port,
 the oldest character in the buffer will be overwritten and thus will be lost.
 
-After a successfull call to RS232_OpenComport(), the os will start to buffer incoming characters.
+After a successful call to RS232_OpenPort(...), the os will start to buffer incoming characters.
 
-tip: To get access to the serial port on Linux, you need to be a member of the group "dialout".
+Tip: To get access to the serial port on Linux, you need to be a member of the group "dialout".
 
-Note: Traditional (on-board) UART's usually have a speed limit of max. 115200 baud.
-            Special cards and USB to Serial converters can usually be set to higher baudrates.
+Note: Traditional (on-board) UART's usually have a speed limit of maximum 115200 bauds.
+      Special cards and USB to Serial converters can usually be set to higher baudrates.
 
 
 List of comport numbers, possible baudrates and modes:
