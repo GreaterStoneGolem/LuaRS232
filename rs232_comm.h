@@ -23,5 +23,9 @@ extern int LuaRS232_FlushRXTX(lua_State* L);
 
 extern int LuaRS232_Sleep(lua_State* L);
 
+// Wrapper to make a Lua style function out of 
+// http://gaiger-programming.blogspot.fr/2015/07/methods-collection-of-enumerating-com.html
+extern int LuaRS232_List(lua_State* L);
+
 
 #endif

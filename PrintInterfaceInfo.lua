@@ -2,6 +2,7 @@
 -- Program to print content of LuaRS232 and LuaRS232.SerialPortOpen(...)
 -- Example usage:
 -- lua-5.3.1\bin\lua53.exe PrintInterfaceInfo.lua COM12
+-- If no portname provided, then it uses the first one found
 local PortName=...
 
 -- Function to format the content of a nested table into printable form
@@ -91,7 +92,23 @@ local LuaRS232=require("LuaRS232")
 print("")
 print("LuaRS232 = "..tostring(LuaRS232))
 print("")
+
 print("")
+for _,Method in ipairs{
+		"CreateFile",
+		"QueryDosDevice",
+		"DefaultCommConfig",
+		"GUID_DEVINTERFACE_COMPORT",
+		"DiClassGuidsFromNamePort",
+		"Registry",
+	} do
+	print("LuaRS232.SerialPortList(\""..Method.."\") = "..tostring(LuaRS232.SerialPortList(Method)))
+	print("")
+end
+
+-- Using first port if none provided
+local PortName=PortName or assert(LuaRS232.SerialPortList(Method)[1],"Not a single port exists!").name
+
 local UART=LuaRS232.SerialPortOpen(PortName)
 print("LuaRS232.SerialPortOpen(...) = "..tostring(UART))
 print("")

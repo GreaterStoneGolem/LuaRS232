@@ -2,6 +2,7 @@
 #include "rs232_comm.h"// Header of this .c file, doing the bridge between Lua and the RS232 C library
 #include "rs232.h"// Header of the RS232 library I got from internet
 #include "sleep.h"// Header of my function that add sleep in Lua
+#include "enumeratecomports.h"// Header of functions to list comm ports
 
 // Size and buffer where data is received
 #define MAX_RECEIVE 1024
@@ -128,6 +129,7 @@ int LuaRS232_Open(lua_State* L)
 		return lua_error(L);
 	}
 
+	printf("Opening RS-232 communication on \"%s\"\n",portname);
 
 	error=RS232_OpenPort(portnumber,baudrate,mode);
 	if(error!=0)
@@ -322,5 +324,96 @@ int LuaRS232_Sleep(lua_State* L)
 	LuaSleep(L);
 	return 1;
 }
+
+int LuaRS232_List(lua_State* L)
+{
+	unsigned int portCount;
+	unsigned char hasFriendlyNames;
+	int i;
+	// Declare tables of names
+	TCHAR portNames[MAX_PORT_NUM][MAX_STR_LEN];
+	TCHAR friendlyNames[MAX_PORT_NUM][MAX_STR_LEN];
+	// Initialize them at 0
+	memset((void*)portNames,0,(MAX_PORT_NUM)*(MAX_STR_LEN));
+	memset((void*)friendlyNames,0,(MAX_PORT_NUM)*(MAX_STR_LEN));
+	hasFriendlyNames=0;
+
+	static const char *const enumMethodNames[]={
+		"CreateFile",
+		"QueryDosDevice",
+		"DefaultCommConfig",
+		"GUID_DEVINTERFACE_COMPORT",
+		"DiClassGuidsFromNamePort",
+		"Registry",
+		NULL};
+	int enumMethodInt=luaL_checkoption(L,1,"DiClassGuidsFromNamePort",enumMethodNames);
+	switch(enumMethodInt)
+	{
+		case 0:
+			EnumerateComPortByCreateFile(&portCount, &portNames[0][0]);
+			break;
+		case 1:
+			EnumerateComPortQueryDosDevice(&portCount, &portNames[0][0]);
+			break;
+		case 2:
+			EnumerateComPortByGetDefaultCommConfig(&portCount, &portNames[0][0]);
+			break;
+		case 3:
+			EnumerateComPortSetupAPI_GUID_DEVINTERFACE_COMPORT(&portCount, &portNames[0][0], &friendlyNames[0][0]);
+			hasFriendlyNames=1;
+			break;
+		case 4:
+			EnumerateComPortSetupAPISetupDiClassGuidsFromNamePort(&portCount, &portNames[0][0], &friendlyNames[0][0]);
+			hasFriendlyNames=1;
+			break;
+		case 5:
+			EnumerateComPortRegistry(&portCount, &portNames[0][0]);
+			break;
+		default:
+			lua_pushfstring(L,"Invalid method name %s, please use %s %s %s %s %s or %s.",
+				enumMethodNames[0],
+				enumMethodNames[1],
+				enumMethodNames[2],
+				enumMethodNames[3],
+				enumMethodNames[4],
+				enumMethodNames[5]);
+			return lua_error(L);// Trigger error
+	}
+
+	// Create a new table, that will be the list of comm port
+	lua_newtable(L);
+
+	// For each port comm
+	for(i=0;i<portCount;++i)
+	{
+		// Create a sub-table for each port comm
+		lua_newtable(L);
+		// First field is name
+		lua_pushstring(L,portNames[i]);
+		lua_setfield(L,-2,"name");
+		// Second field, fullname, only with some methods
+		if(hasFriendlyNames)
+		{
+			lua_pushstring(L,friendlyNames[i]);
+			lua_setfield(L,-2,"fullname");
+		}
+		// Put it in the list of port comm
+		lua_seti(L,-2,1+i);
+	}
+
+	return 1;
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 

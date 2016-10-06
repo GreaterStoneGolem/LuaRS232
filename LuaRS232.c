@@ -31,6 +31,9 @@ static const struct luaL_Reg LuaRS232API[] = {
 	// Function to wait for n milliseconds:
 	{"Sleep",LuaSleep},
 
+	// Function to list all serial port
+	{"SerialPortList",LuaRS232_List},
+
 	// Function to open a comm port, return a table with the rest of the interface
 	{"SerialPortOpen",LuaRS232_Open},
 

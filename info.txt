@@ -1,0 +1,122 @@
+LuaRS232 loaded!
+
+LuaRS232 = {
+	["Bin2Hex"]          = function(...) ... end,
+	["GetKeyPress"]      = function(...) ... end,
+	["Hex2Bin"]          = function(...) ... end,
+	["InvertEndianness"] = function(...) ... end,
+	["SayHello"]         = function(...) ... end,
+	["SerialPortList"]   = function(...) ... end,
+	["SerialPortOpen"]   = function(...) ... end,
+	["Sleep"]            = function(...) ... end,
+},
+
+
+
+LuaRS232.SerialPortList("CreateFile") = {
+	[1] =
+		{
+			["name"] = "\\.\COM12",
+		},
+	[2] =
+		{
+			["name"] = "\\.\COM13",
+		},
+},
+
+
+LuaRS232.SerialPortList("QueryDosDevice") = {
+	[1] =
+		{
+			["name"] = "COM12",
+		},
+	[2] =
+		{
+			["name"] = "COM13",
+		},
+},
+
+
+LuaRS232.SerialPortList("DefaultCommConfig") = {
+	[1] =
+		{
+			["name"] = "COM12",
+		},
+	[2] =
+		{
+			["name"] = "COM13",
+		},
+},
+
+
+LuaRS232.SerialPortList("GUID_DEVINTERFACE_COMPORT") = {
+	[1] =
+		{
+			["fullname"] = "ATEN USB to Serial Bridge",
+			["name"]     = "COM12",
+		},
+	[2] =
+		{
+			["fullname"] = "Prolific USB-to-Serial Comm Port",
+			["name"]     = "COM13",
+		},
+},
+
+
+LuaRS232.SerialPortList("DiClassGuidsFromNamePort") = {
+	[1] =
+		{
+			["fullname"] = "Prolific USB-to-Serial Comm Port",
+			["name"]     = "COM13",
+		},
+	[2] =
+		{
+			["fullname"] = "ATEN USB to Serial Bridge",
+			["name"]     = "COM12",
+		},
+},
+
+
+LuaRS232.SerialPortList("Registry") = {
+	[1] =
+		{
+			["name"] = "COM12",
+		},
+	[2] =
+		{
+			["name"] = "COM13",
+		},
+},
+
+
+Opening RS-232 communication on "COM13"
+LuaRS232.SerialPortOpen(...) = {
+	["Close"]        = function(...) ... end,
+	["DisableDTR"]   = function(...) ... end,
+	["DisableRTS"]   = function(...) ... end,
+	["EnableDTR"]    = function(...) ... end,
+	["EnableRTS"]    = function(...) ... end,
+	["FlushRX"]      = function(...) ... end,
+	["FlushTX"]      = function(...) ... end,
+	["GetPinStatus"] = function(...) ... end,
+	["Open"]         = function(...) ... end,
+	["Receive"]      = function(...) ... end,
+	["Send"]         = function(...) ... end,
+	["Sleep"]        = function(...) ... end,
+	["name"]         = "COM13",
+	["internal"]     =
+		{
+			["portnbr"] = 12,
+		},
+	["settings"]     =
+		{
+			["baudrate"] = 115200,
+			["databits"] = 8,
+			["stopbits"] = 1,
+			["parity"]   = "N",
+		},
+},
+
+
+
+Closing RS-232 communication on "COM13"
