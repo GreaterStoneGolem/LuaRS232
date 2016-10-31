@@ -1,14 +1,17 @@
 
 #include "rs232_comm.h"// Header of this .c file, doing the bridge between Lua and the RS232 C library
-#include "rs232.h"// Header of the RS232 library I got from internet
 #include "sleep.h"// Header of my function that add sleep in Lua
+#include <stdio.h>// For reasons. Maybe.
+#include <string.h>// For strcat and sprintf and the likes.
+#include <ctype.h>// For tolower
+#include <windows.h>// Because I use Windows API
 #include "enumeratecomports.h"// Header of functions to list comm ports
 
 // Size and buffer where data is received
 #define MAX_RECEIVE 1024
 unsigned char receptionbuffer[MAX_RECEIVE];
 
-// List function to add a to serial port
+// List functions to add a to serial port
 struct luaL_Reg SerialPortAPI[] = {
 	// RS-232 interface functions
 	{"Open",LuaRS232_Open},// Open is to be called not from there but by what return this table
@@ -27,13 +30,13 @@ struct luaL_Reg SerialPortAPI[] = {
 };
 
 
-// All my other function must be called by passing as first argument:
-// - A Serial Comm Object, that is, a Lua table, with internal.portnbr as a field
+// All my other functions must be called by passing as first argument:
+// - A Serial Comm Object, that is, a Lua table, with internal.handle as a field
 // So this function look at the first object of the stack
-// Check it is a table, with a element with name internal that is itself a table with an element portnbr which is a number
-// And it returns this number
+// Check it is a table, with a element with name internal that is itself a table with an element handle which is a number
+// And it returns this number casted into a handle
 // Otherwise, throws a Lua error
-int GetPortNbr(lua_State *L)
+void* GetPortHandle(lua_State *L)
 {
 	if(!lua_istable(L,1))
 	{
@@ -43,19 +46,22 @@ int GetPortNbr(lua_State *L)
 	{
 		lua_pushstring(L,"Error: First stack element is a table without an internal table");
 	}
-	else if(lua_getfield(L,-1,"portnbr")!=LUA_TNUMBER)
+	else if(lua_getfield(L,-1,"handle")!=LUA_TNUMBER)
 	{
-		lua_pushstring(L,"Error: First stack element is a table with an internal table without a portnbr number");
+		lua_pushstring(L,"Error: First stack element is a table with an internal table without a handle number");
 	}
 	else
 	{
-		return lua_tointeger(L,-1);
+		return (void*)lua_tointeger(L,-1);
 	}
-	return lua_error(L);
+	lua_error(L);
+	return NULL;
 }
 
 
-const char* GetPortName(lua_State *L)
+// Takes a lua_State*, check there's a table at the start of this Lua stack, and return the value of ["name"] in that table
+// Not a Lua bind, but takes a lua_State* with the table where to find the name
+const char* GetPortNameFromTable(lua_State* L)
 {
 	if(!lua_istable(L,1))
 	{
@@ -63,7 +69,7 @@ const char* GetPortName(lua_State *L)
 	}
 	else if(lua_getfield(L,1,"name")!=LUA_TSTRING)
 	{
-		lua_pushstring(L,"Error: First stack element is a table without an name string");
+		lua_pushstring(L,"Error: First stack element is a table without a name string");
 	}
 	else
 	{
@@ -73,6 +79,105 @@ const char* GetPortName(lua_State *L)
 	return "";// Never happens, but to respect C signature
 }
 
+
+// Takes a number, returns a port name built from it
+// Not a Lua bind, but takes a lua_State* so it can throw a Lua error
+char* GetPortNameByNbr(lua_State* L,const int portnumber)
+{
+	static char portname[16];
+	if(portnumber<1 || portnumber>99)
+	{
+		lua_pushfstring(L,"%d is not a valid port number",portnumber);
+		lua_error(L);
+	}
+	sprintf(portname,"\\\\.\\COM%d",portnumber);
+	return portname;
+}
+
+
+// Takes a port name, return the number at the end of it, or -1 if invalid name
+// Not a Lua bind, but takes a lua_State* so it can throw a Lua error
+int GetPortNbrByName(lua_State* L,const char* portname)
+{
+	const char* digits;// digits point to a constant, but digits itself isn't constant
+	if(strncmp(portname,"COM",3)==0 && portname[3]!=0)
+	{
+		digits=&portname[3];
+	}
+	else if(strncmp(portname,"\\\\.\\COM",7)==0 && portname[7]!=0)
+	{
+		digits=&portname[7];
+	}
+	else
+	{
+		lua_pushfstring(L,"Invalid port name: \"%s\" doesn't start by \"COM\" nor by \"\\\\.\\COM\" so isn't a port name",portname);
+		lua_error(L);
+	}
+	int n=0;
+	while(*digits!=0)
+	{
+		n*=10;
+		if(*digits>='0' && *digits<='9')
+		{
+			n+=*digits-'0';
+		}
+		else
+		{
+			lua_pushfstring(L,"Invalid port name: \"%s\" has '%c' which is not a digit",portname,*digits);
+			lua_error(L);
+		}
+		++digits;
+	}
+	if(n<1 || n>99)
+	{
+		lua_pushfstring(L,"Invalid port name: \"%s\" would be port number %d which is out of range",portname,n);
+		lua_error(L);
+	}
+	return n;
+}
+
+
+// Function to remove the leading \\.\ or /dev/ from a portname
+const char* ShortenPortName(const char* name)
+{
+	if(strncmp(name,"\\\\.\\",4)==0)
+	{
+		return name+4;
+	}
+	if(strncmp(name,"/dev/",5)==0)
+	{
+		return name+5;
+	}
+	return name;
+}
+
+
+// Function to get a string describing the last error that happened within Windows API (Not a Lua bind)
+char* GetLastErrorStr(void)
+{
+	DWORD errorCode = GetLastError();
+	LPVOID lpMsgBuf;
+	DWORD bufLen = FormatMessage(
+		FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+		FORMAT_MESSAGE_FROM_SYSTEM |
+		FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL,
+		errorCode,
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		(LPTSTR)&lpMsgBuf,
+		0, NULL );
+	if(bufLen)
+	{
+		LPCSTR lpMsgStr = (LPCSTR)lpMsgBuf;
+		return (char*)lpMsgStr;
+	}
+	else
+	{
+		static char errmsg[32];
+		sprintf(errmsg,"Unknown Error %d",errorCode);
+		return errmsg;
+	}
+}
 
 
 
@@ -85,33 +190,38 @@ int LuaRS232_Open(lua_State* L)
 		return lua_error(L);
 	}
 
+
 	// Convert parameters from Lua stack to C variables, or use default values
 	const char* portname = lua_gettop(L)>=1 ? lua_tostring(L,1) : "COM1";
 	const int   baudrate = lua_gettop(L)>=2 ? lua_tonumber(L,2) : 115200;
 	const char* mode     = lua_gettop(L)>=3 ? lua_tostring(L,3) : "8N1";
 
-	// RS232_GetPortNbr converts a port name into a port number
-	/*
-       +-------------+-------+---------+
-       | Port Number | Linux | Windows |
-       +-------------+-------+---------+
-       |       0     | ttyS0 | COM1    |
-       |       1     | ttyS1 | COM2    |
-       |       2     | ttyS2 | COM3    |
-       |       3     | ttyS3 | COM4    |
-       |       0     | ...   | ...     |
-    Beware, Windows numbering start at 1,
-    but Linux numbering and
-   this lib internal numbering start at 0.
-	*/
 
-	int portnumber;
-	char* error=RS232_GetPortNbr(portname,&portnumber);
-	// returns -1 if invalid port name
-	if(error)
+	// Check that portname is a valid port name
+	// Besides checking name validity it also returns the number of the port
+	int portnumber=GetPortNbrByName(L,portname);
+
+	// Get the port name back from port number, this way we ensure there's the leading \\.\ that CreateFile needs
+	const char* portslashedname=GetPortNameByNbr(L,portnumber);
+
+
+	// Check that baudrate is an allowed value
 	{
-		lua_pushfstring(L,"RS232 Open received an invalid port name: \"%s\" %s",portname,error);
-		return lua_error(L);
+		int AllowedList[]={110,300,600,1200,2400,4800,9600,19200,38400,57600,115200,128000,256000,500000,1000000};
+		char IsAllowed=0;
+		unsigned int bindex;
+		for(bindex=0;bindex<sizeof(AllowedList)/sizeof(int);++bindex)
+		{
+			if(baudrate==AllowedList[bindex])
+			{
+				IsAllowed=1;
+			}
+		}
+		if(!IsAllowed)
+		{
+			lua_pushfstring(L,"RS232 Open received an invalid baud rate: %d",baudrate);
+			return lua_error(L);
+		}
 	}
 
 
@@ -129,14 +239,73 @@ int LuaRS232_Open(lua_State* L)
 		return lua_error(L);
 	}
 
-	printf("Opening RS-232 communication on \"%s\"\n",portname);
 
-	error=RS232_OpenPort(portnumber,baudrate,mode);
-	if(error!=0)
+	// Open file handle
+	void* handle = CreateFileA(
+		portslashedname,
+		GENERIC_READ|GENERIC_WRITE,
+		0,          /* no share  */
+		NULL,       /* no security */
+		OPEN_EXISTING,
+		0,          /* no threads */
+		NULL);      /* no templates */
+
+	if(handle==INVALID_HANDLE_VALUE)
 	{
-		lua_pushfstring(L,"RS232 Open (\"%s\",%d,%s) failed: %s",portname,baudrate,mode,error);
+		lua_pushfstring(L,"RS232 Open (\"%s\",%d,%s) failed: Unable to open com port %s",portname,baudrate,mode,portslashedname);
 		return lua_error(L);
 	}
+
+
+	// Create the string describing the configuration, to pass to BuildCommDCBA
+	// It's in the format: COMx[:][baud=b][parity=p][data=d][stop=s][to={on|off}][xon={on|off}][odsr={on|off}][octs={on|off}][dtr={on|off|hs}][rts={on|off|hs|tg}][idsr={on|off}]
+	char settings_as_string[128];
+	sprintf(settings_as_string,"baud=%d parity=%c data=%d stop=%d dtr=%s rts=%s",baudrate,tolower(parity),databits,stopbits,"on","on");
+
+	// Create a little "DCB structure", empty beside its length field
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa363214
+	DCB settings_as_structure;
+	memset(&settings_as_structure, 0, sizeof(settings_as_structure)); /* clear the new struct */
+	settings_as_structure.DCBlength = sizeof(settings_as_structure);
+
+	// Function that parse the string to fill the DCB structure
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa363143
+	if(!BuildCommDCBA(settings_as_string, &settings_as_structure))
+	{
+		CloseHandle(handle);
+		lua_pushfstring(L,"RS232 Open (\"%s\",%d,%s) failed: Unable to fill setting structure via BuildCommDCBA",portname,baudrate,mode);
+		return lua_error(L);
+	}
+
+	// Configure the communication according to the DCB structure
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa363436
+	if(!SetCommState(handle, &settings_as_structure))
+	{
+		CloseHandle(handle);
+		lua_pushfstring(L,"RS232 Open (\"%s\",%d,%s) failed: Unable to SetCommState",portname,baudrate,mode);
+		return lua_error(L);
+	}
+
+
+	// Create the structure containing the time-out parameters for the communications device
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa363190
+	COMMTIMEOUTS CommTimeouts;
+	CommTimeouts.ReadIntervalTimeout         = MAXDWORD;
+	CommTimeouts.ReadTotalTimeoutMultiplier  = 0;
+	CommTimeouts.ReadTotalTimeoutConstant    = 0;
+	CommTimeouts.WriteTotalTimeoutMultiplier = 0;
+	CommTimeouts.WriteTotalTimeoutConstant   = 0;
+
+	// Apply the time-out parameters
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa363437
+	if(!SetCommTimeouts(handle, &CommTimeouts))
+	{
+		CloseHandle(handle);
+		lua_pushfstring(L,"RS232 Open (\"%s\",%d,%s) failed: Unable to set comport time-out settings",portname,baudrate,mode);
+		return lua_error(L);
+	}
+
+	printf("Opened RS-232 communication on \"%s\".\n",ShortenPortName(portslashedname));
 
 	// Create a new table, that will be the comm object
 	lua_newtable(L);
@@ -156,14 +325,16 @@ int LuaRS232_Open(lua_State* L)
 		lua_setfield(L,-2,"baudrate");
 	lua_setfield(L,-2,"settings");
 
-	// Add internal sub-table
+	// Add internal sub-table, to store handle (casted from void* to unsigned integer), and portnumber (from 1 to 99)
 	lua_newtable(L);
+		lua_pushinteger(L,(unsigned int)handle);
+		lua_setfield(L,-2,"handle");
 		lua_pushinteger(L,portnumber);
-		lua_setfield(L,-2,"portnbr");
+		lua_setfield(L,-2,"portnumber");
 	lua_setfield(L,-2,"internal");
 
 	// Add name
-	lua_pushstring (L,portname);
+	lua_pushstring (L,portslashedname);
 	lua_setfield(L,-2,"name");
 
 	// Create a table that will be the metatable of the returned comm object
@@ -181,19 +352,27 @@ int LuaRS232_Open(lua_State* L)
 
 int LuaRS232_Close(lua_State* L)
 {
-	printf("Closing RS-232 communication on \"%s\"\n",GetPortName(L));
-	char* error=RS232_ClosePort(GetPortNbr(L));
-	if(error!=0)
+	if(!CloseHandle(GetPortHandle(L)))
 	{
-		lua_pushfstring(L,"RS232 Close failed: %s",error);
+		lua_pushfstring(L,"RS232 Close failed: %s",GetLastErrorStr());
 		return lua_error(L);
 	}
+	// Get the port name from the Lua table in the stack,
+	// using a generic name instead of erroring
+	// if no "name" field in the table at start of Lua stack
+	const char* portname="a serial port";
+	if(lua_istable(L,1) && lua_getfield(L,1,"name")==LUA_TSTRING)
+	{
+		portname=lua_tostring(L,-1);
+	}
+	printf("Closed RS-232 communication on \"%s\".\n",ShortenPortName(portname));
 	return 0;
 }
 
+
 int LuaRS232_Send(lua_State* L)
 {
-	int port=GetPortNbr(L);
+	void* handle=GetPortHandle(L);
 
 	// Check argument
 	if(!lua_isstring(L,2))
@@ -211,21 +390,29 @@ int LuaRS232_Send(lua_State* L)
 		return lua_error(L);
 	}
 
-	// Send and verify all the bytes were sent
+	// Write buffer to file handle
 	int nbrbytessent;
-	char* error=RS232_SendBuffer(port,message,length,&nbrbytessent);
-	if(error)
+	if(!WriteFile(handle, message, length, (LPDWORD)((void*)&nbrbytessent), NULL))
 	{
-		lua_pushfstring(L,"RS232 Send error: %s",error);
+		lua_pushfstring(L,"RS232 Send failed: %s",GetLastErrorStr());
 		return lua_error(L);
 	}
 
+	// If this is negative, this could indicate an error
+	if(nbrbytessent<0)
+	{
+		lua_pushfstring(L,"RS232 Send failed: Bad Write count: %d",nbrbytessent);
+		return lua_error(L);
+	}
+
+	// Check all the bytes were sent
 	if(nbrbytessent!=length)
 	{
-		lua_pushfstring(L,"RS232 Send failed, only %d bytes out of %d sent",nbrbytessent,length);
+		lua_pushfstring(L,"RS232 Send failed: Only %d out of %d bytes sent",nbrbytessent,length);
 		return lua_error(L);
 	}
 
+	// All ok
 	return 0;
 }
 
@@ -233,13 +420,18 @@ int LuaRS232_Send(lua_State* L)
 
 int LuaRS232_Receive(lua_State* L)
 {
-	int port=GetPortNbr(L);
-
+	void* handle=GetPortHandle(L);
+	/* Using a void pointer cast, otherwise gcc will complain about */
+	/* "Warning: dereferencing type-punned pointer will break strict aliasing rules" */
 	int length;
-	char* error=RS232_ReadBuffer(port,receptionbuffer,MAX_RECEIVE,&length);
-	if(error)
+	if(!ReadFile(handle, receptionbuffer, MAX_RECEIVE, (LPDWORD)((void*)&length), NULL))
 	{
-		lua_pushfstring(L,"RS232 Receive error: %s",error);
+		lua_pushfstring(L,"RS232 Receive failed: %s",GetLastErrorStr());
+		return lua_error(L);
+	}
+	if(length<0)
+	{
+		lua_pushfstring(L,"RS232 Receive failed: Bad Read count: %d",length);
 		return lua_error(L);
 	}
 	if(length==MAX_RECEIVE)
@@ -253,67 +445,107 @@ int LuaRS232_Receive(lua_State* L)
 
 int LuaRS232_EnableDTR(lua_State* L)
 {
-	RS232_EnableDTR(GetPortNbr(L));
+	if(!EscapeCommFunction(GetPortHandle(L), SETDTR))
+	{
+		lua_pushfstring(L,"RS232 EnableDTR failed: %s",GetLastErrorStr());
+		return lua_error(L);
+	}
 	return 0;
 }
 
 
 int LuaRS232_DisableDTR(lua_State* L)
 {
-	RS232_DisableDTR(GetPortNbr(L));
+	if(!EscapeCommFunction(GetPortHandle(L), CLRDTR))
+	{
+		lua_pushfstring(L,"RS232 DisableDTR failed: %s",GetLastErrorStr());
+		return lua_error(L);
+	}
 	return 0;
 }
 
 
 int LuaRS232_EnableRTS(lua_State* L)
 {
-	RS232_EnableRTS(GetPortNbr(L));
+	if(!EscapeCommFunction(GetPortHandle(L), SETRTS))
+	{
+		lua_pushfstring(L,"RS232 EnableRTS failed: %s",GetLastErrorStr());
+		return lua_error(L);
+	}
 	return 0;
 }
 
 
 int LuaRS232_DisableRTS(lua_State* L)
 {
-	RS232_DisableRTS(GetPortNbr(L));
+	if(!EscapeCommFunction(GetPortHandle(L), CLRRTS))
+	{
+		lua_pushfstring(L,"RS232 DisableRTS failed: %s",GetLastErrorStr());
+		return lua_error(L);
+	}
 	return 0;
 }
 
 
 int LuaRS232_GetPinStatus(lua_State* L)
 {
-	int port=GetPortNbr(L);
+	int status;
+	// https://msdn.microsoft.com/en-us/library/windows/desktop/aa363258
+	if(!GetCommModemStatus(GetPortHandle(L), (LPDWORD)((void*)&status)))
+	{
+		lua_pushfstring(L,"RS232 GetPinStatus failed: %s",GetLastErrorStr());
+		return lua_error(L);
+	}
 	lua_newtable(L);
-	lua_pushboolean(L,RS232_IsDSREnabled(port));
+	lua_pushboolean(L,status&MS_CTS_ON);
+	lua_setfield(L,-2,"CTS");
+	lua_pushboolean(L,status&MS_DSR_ON);
 	lua_setfield(L,-2,"DSR");
-	lua_pushboolean(L,RS232_IsCTSEnabled(port));
-	lua_setfield(L,-2,"CTS");
-	lua_pushboolean(L,RS232_IsDCDEnabled(port));
+	lua_pushboolean(L,status&MS_RING_ON);
+	lua_setfield(L,-2,"RING");
+	lua_pushboolean(L,status&MS_RLSD_ON);
+	lua_setfield(L,-2,"RLSD");
+	lua_pushboolean(L,status&MS_RLSD_ON);
 	lua_setfield(L,-2,"DSD");
-	lua_pushboolean(L,RS232_IsDSREnabled(port));
-	lua_setfield(L,-2,"CTS");
 	return 1;
 }
 
 
 int LuaRS232_FlushRX(lua_State* L)
 {
-	RS232_FlushRX(GetPortNbr(L));
+	if(!PurgeComm(GetPortHandle(L), PURGE_RXCLEAR | PURGE_RXABORT))
+	{
+		lua_pushfstring(L,"RS232 FlushRX failed: %s",GetLastErrorStr());
+		return lua_error(L);
+	}
 	return 0;
 }
 
 
 int LuaRS232_FlushTX(lua_State* L)
 {
-	RS232_FlushTX(GetPortNbr(L));
+	if(!PurgeComm(GetPortHandle(L), PURGE_TXCLEAR | PURGE_TXABORT))
+	{
+		lua_pushfstring(L,"RS232 FlushTX failed: %s",GetLastErrorStr());
+		return lua_error(L);
+	}
 	return 0;
 }
 
 
 int LuaRS232_FlushRXTX(lua_State* L)
 {
-	int port=GetPortNbr(L);
-	RS232_FlushRX(port);
-	RS232_FlushTX(port);
+	void* handle=GetPortHandle(L);
+	if(!PurgeComm(handle, PURGE_RXCLEAR | PURGE_RXABORT))
+	{
+		lua_pushfstring(L,"RS232 FlushRXTX failed: %s",GetLastErrorStr());
+		return lua_error(L);
+	}
+	if(!PurgeComm(handle, PURGE_TXCLEAR | PURGE_TXABORT))
+	{
+		lua_pushfstring(L,"RS232 FlushRXTX failed: %s",GetLastErrorStr());
+		return lua_error(L);
+	}
 	return 0;
 }
 

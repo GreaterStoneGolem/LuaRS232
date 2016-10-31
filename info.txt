@@ -89,7 +89,7 @@ LuaRS232.SerialPortList("Registry") = {
 },
 
 
-Opening RS-232 communication on "COM13"
+Opened RS-232 communication on "COM13".
 LuaRS232.SerialPortOpen(...) = {
 	["Close"]        = function(...) ... end,
 	["DisableDTR"]   = function(...) ... end,
@@ -103,10 +103,11 @@ LuaRS232.SerialPortOpen(...) = {
 	["Receive"]      = function(...) ... end,
 	["Send"]         = function(...) ... end,
 	["Sleep"]        = function(...) ... end,
-	["name"]         = "COM13",
+	["name"]         = "\\.\COM13",
 	["internal"]     =
 		{
-			["portnbr"] = 12,
+			["handle"]     = 312,
+			["portnumber"] = 13,
 		},
 	["settings"]     =
 		{
@@ -119,4 +120,4 @@ LuaRS232.SerialPortOpen(...) = {
 
 
 
-Closing RS-232 communication on "COM13"
+Closed RS-232 communication on "COM13".

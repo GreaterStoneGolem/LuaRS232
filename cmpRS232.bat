@@ -9,7 +9,7 @@ REM Check if compiler is present in path, add MinGW to path if no
 g++ --help > NUL 2>&1 || set PATH=C:\MinGW\bin;%PATH%
 
 REM Compile all the .c and into a .o
-g++ -c *.c RS-232/*.c -I %LUA53%/src -I RS-232 || exit /b 1
+g++ -c *.c -I %LUA53%/src || exit /b 1
 REM Turn the .o into the .dll
 g++ -L%LUA53%\bin -LRS-232 -lsetupapi -shared -o LuaRS232.dll *.o -llua53 -lwinmm -I %LUA53%/src -static-libgcc -static-libstdc++ || exit /b 1
 

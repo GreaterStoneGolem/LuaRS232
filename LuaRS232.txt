@@ -1,0 +1,404 @@
+
+
+LuaRS232 Content Overview
+=======================
+
+LuaRS232.dll is a library to use a serial port (aka Com Port, aka UART, aka RS232) in Lua.
+
+It is a C to Lua wrapper around Windows API functions such as CreateFileA and SetCommState.
+
+In addition a couple helper functions are provided, in particular:
+- to convert binary strings into their printable hexadecimal representation and back
+- to invert the order of bytes in a binary string
+- to retrieve key presses in a non blocking way
+- to sleep a given amount of milliseconds
+
+
+Dependencies:
+- Windows only at the moment, because I don't have a Linux box at hand to test it on
+- It's meang to be used by a Lua script, and to run Lua scripts you need [lua53.exe] and [lua53.dll]
+- Get Lua binaries from http://sourceforge.net/projects/luabinaries/files/5.3/Tools%20Executables/lua-5.3_Win32_bin.zip
+- Get Lua sources (if you need to recompile) from http://www.lua.org/ftp/lua-5.3.1.tar.gz
+
+There are no returned error codes, instead Lua errors are thrown when anything goes wrong. Use pcall if you need to proceed despite errors.
+
+Messages are printed to stdout when library is loaded, when a serial port communication is opened and closed, and when Receive returns the maximum amount of bytes.
+Otherwise data is passed as Lua variables and must be explicitly printed as needed.
+
+Since Lua strings are not zero terminated and can contain any bytes, there is no distinction between binary mode and text mode.
+Bin2Hex and Hex2Bin are provided as convenience to write and read binary. But you may prefer to use escaping, such as "\x00" to write hex in strings, or string.pack and string.unpack, to encode and decode numbers to and from binary.
+
+
+Usage:
+At the beginning of your Lua script, have:
+	local LuaRS232=require("LuaRS232")
+This create a table, LuaRS232, with:
+	- Functions to list serial ports
+	- Function to open a serial port
+	- Functions to help manage binary strings
+	- Function to read key presses
+	- Function to wait a bit
+
+Merely require("LuaRS232") doesn't open a connection yet:
+- To open a connection you must pass a valid port name to the SerialPortOpen function
+- To get a list of valid port names, you may want to call the SerialPortList function which return a table listing all connected serial ports
+
+For example:
+
+	-- Load library
+	local LuaRS232=require("LuaRS232")
+
+	-- Retrieve list of available ports
+	local PortList=LuaRS232.SerialPortList()
+
+	-- Using first port in the list of comm port (Warning: they are not always sorted by port number!)
+	local PortName=assert(PortList[1],"Not a single port exists!").name
+
+	-- Open communication the port
+	local UART=LuaRS232.SerialPortOpen(PortName)
+
+	-- Send some message
+	UART:Send("Hello!\r\n")
+
+	-- Wait a second
+	UART:Sleep(1000)
+
+	-- Get and print any pending bytes from the serial port
+	print(UART:Receive())
+
+
+
+
+LuaRS232 Members
+================
+
+
+(function) SerialPortList
+---------------------
+(table) PortList SerialPortList( [(string) MethodName] )
+
+Input: Either nothing for default method, or the name of the method to use.
+
+There are many different ways to retrieve the list of serial port under Windows. Six of them are implemented in that library: "CreateFile", "QueryDosDevice", "DefaultCommConfig", "GUID_DEVINTERFACE_COMPORT", "DiClassGuidsFromNamePort", "Registry". The default, used if no argument is provided, is DiClassGuidsFromNamePort. They don't return exactly the same thing: Only with CreateFile there is the leading \\.\ and only with GUID_DEVINTERFACE_COMPORT and DiClassGuidsFromNamePort are the fullname available.
+
+Return: A list of comm port, where each device is a table with a "name" fields, and for some methods, a "fullname" field.
+This table is not sorted. And content may varies depending on which method was used.
+
+
+Example:
+	LuaRS232.SerialPortList() ->
+	{
+		[1] =
+			{
+				["fullname"] = "Prolific USB-to-Serial Comm Port",
+				["name"]     = "COM17",
+			},
+		[2] =
+			{
+				["fullname"] = "USB-SERIAL CH340",
+				["name"]     = "COM16",
+			},
+		[3] =
+			{
+				["fullname"] = "ATEN USB to Serial Bridge",
+				["name"]     = "COM15",
+			},
+	},
+
+
+(function) SerialPortOpen
+---------------
+(table) port Open( portname )
+
+Input: A port name, either "COMxx" or "\\.\COMxx" where xx is the port number.
+If you use the second form, take care that \ needs to be escaped, so you have to actually write either "\\\\.\\COMxx" or [[\\.\COMxx]]
+
+Return: A table providing interface and handle to the comm port that was opened.
+
+This table has a metatable to automatically call Close as soon as it's garbage collected.
+The functions in this table expect their first argument to be the table, they are member function, to be called with :
+The open port is tracked by its handle, the field name and portnumber are just for information.
+
+Example:
+	LuaRS232.SerialPortOpen("COM12") ->
+	{
+		["Close"]        = function(...) ... end,
+		["DisableDTR"]   = function(...) ... end,
+		["DisableRTS"]   = function(...) ... end,
+		["EnableDTR"]    = function(...) ... end,
+		["EnableRTS"]    = function(...) ... end,
+		["FlushRX"]      = function(...) ... end,
+		["FlushTX"]      = function(...) ... end,
+		["GetPinStatus"] = function(...) ... end,
+		["Open"]         = function(...) ... end,
+		["Receive"]      = function(...) ... end,
+		["Send"]         = function(...) ... end,
+		["Sleep"]        = function(...) ... end,
+		["name"]         = "\\.\COM12",
+		["internal"]     =
+			{
+				["handle"]     = 248,
+				["portnumber"] = 12,
+			},
+		["settings"]     =
+			{
+				["baudrate"] = 115200,
+				["databits"] = 8,
+				["stopbits"] = 1,
+				["parity"]   = "N",
+			},
+	},
+
+
+(function) GetKeyPress
+----------------------
+(integer) keycode GetKeyPress( )
+
+Input: Nothing
+
+Return: A keycode corresponding to last key pressed, or 0 if no key pressed
+
+Useful to check for key presses without blocking. This is based on kbhit and getch from conio.h. Arrow keys count for two key hits.
+
+Example:
+	local key=LuaRS232.GetKeyPress()
+	if key==27 then-- 27 for esc key
+		echo("Aborting.")
+		return
+	end
+
+
+(function) Hex2Bin
+------------------
+(string) strbin Hex2Bin( (string) strhex )
+
+Input: A Lua string containing hexadecimal digits. Whitespaces and 0x are ignored.
+
+Return: A Lua string containing binary data, that means it may contain NULL or other non-printable characters.
+
+Description:
+Takes a string containing an hexadecimal representation of data. Strips it of spaces, tabs, return carriage, new lines, slashes and anti-slashes. Strips it of 0x and 0X. Verifies only hexadecimal digits are left, throws an error if not. Converts it to binary data. Returns that binary data as a Lua string.
+
+Example:
+LuaRS232.Hex2Bin("48 656C\n6C 0x6F21") -> "Hello!"
+
+
+(function) Bin2Hex
+------------------
+(string) strhex Bin2Hex( (string) strbin )
+
+Input: A Lua string containing raw binary data. That means including NULL and other non printable characters.
+
+Return: A Lua string containing hexadecimal digits, or more precisely, space separated pairs of hexadecimal digits.
+
+Example:
+LuaRS232.Bin2Hex("AB\x00\t") -> "41 42 00 09"
+
+
+(function) InvertEndianness
+---------------------------
+(string) strbininv InvertEndianness( (string) strbin )
+
+Input: A Lua string containing binary data.
+
+Output: A Lua string containing binary data, with same bytes as the input but in reverse order.
+
+Example:
+LuaRS232.InvertEndianness("star") -> "rats"
+
+
+(function) Sleep
+---------------------------
+(nothing) Sleep( (number) duration_in_milliseconds )
+
+Example:
+LuaRS232.Sleep(500)-- Sleep half a second
+
+
+
+
+Serial Port: Intro
+==================
+
+We will call "LuaRS232" the table returned by require("LuaRS232")
+We will call "UART" the table returned by the function LuaRS232.SerialPortOpen.
+We will call "port handle" the value of UART.internal.handle.
+
+The table returned by LuaRS232.SerialPortOpen contains methods, where method means function with self as first argument.
+That is, the two forms below are equivalent, though the first is preferred:
+	UART:Receive()
+	UART.Receive(UART)
+
+This table also contain one non method function, Open, which shouldn't be used anyway, and some plain fields with some info about the port, from when it was opened.
+
+
+Serial Port: Methods
+====================
+
+
+Send
+----
+
+Input: A Lua string, it's transmitted as is, so it can be either a binary string, or proper text.
+Output: None
+
+Exemples:
+	UART:Send("Hi!\r\n) -- Send the characters 'H' 'i' '!' then a carriage return and new line
+	UART:Send("\x48\x69\x21\x0D\x0A") -- Send bytes of values 0x48 0x69 0x21 0x0D 0x0A
+
+Since Lua already allocates whatever string you send, there is no size limit in the library itself, though the system and the driver most likely have their own limits.
+
+
+Receive
+-------
+Input: None
+Output: A Lua string, may or may not be printable.
+
+It returns the content of the serial port buffer at the moment it was called. Calling Receive empties the buffer.
+If you need polling, you have to implement it yourself using Receive and Sleep.
+If you need to deal with complete frame and not just stream of bytes, you'll have to implement frame bufferisation yourself.
+
+This library used a fixed internal buffer of 1024 for reception, so Receive will return at max 1024 bytes. Call it again if you need more bytes.
+Beside a message printed in stdout or checking returned string size, there's no easy way to know that happened.
+This buffer is independent from any buffer of the serial port driver itself.
+
+Some RS232 terminals end lines with a return carriage ("\r") without a new line ("\n"). If you receive and print that, then the end will be displayed over the start. This is independent from RS232 library and driver, even in plain Lua print("123456\rABC") results in ABC456. If this is a problem, I suggest using something like print((UART:Receive():gsub("[\r\n]+","\r\n")))
+
+
+Close
+-----
+Input: none
+Output: none
+
+Description:
+Close down the serial port. Of course you should not use Send or Receive afterwards. You do not need to explicitly call Close, as the Serial Port table has been set up to automatically do this Close as soon as it goes out of scope and is garbage collected.
+
+
+Open
+-----
+Input: none
+Output: none
+
+Description:
+It has no business being here, especially considering how it doesn't follow the same calling convention as the others, being a function and not a method.
+
+
+Sleep
+-----
+Input: Time to sleep, expressed in milliseconds, as a Lua number.
+Output: None
+
+Description:
+For convenience, the sleep function has been added as a method of serial port, in addition of being available as directly a function of the library.
+
+
+FlushRX
+-------
+Input: none
+Output: none
+
+Description:
+I guess it empties the reception buffer. But as buffer is emptied when port is opened, and on read, I never needed it.
+
+
+FlushRX
+-------
+Input: none
+Output: none
+
+Description:
+I guess it empties the emission buffer. But I wouldn't even know how to clog the emission buffer.
+
+
+GetPinStatus
+------------
+Input: none
+Output: none
+
+Description:
+Give the status of some control registers of the serial port.
+
+Exemple:
+	UART:GetPinStatus() ->
+	{
+			["CTS"]  = true,  -- Is Clear-To-Send signal on?
+			["DSD"]  = true,  -- Same as RLSD
+			["DSR"]  = true,  -- Is Data-Set-Ready signal on?
+			["RING"] = false, -- Is Ring Indicator Signal on?
+			["RLSD"] = true,  -- Is Receive-Line-Signal-Detect on?
+	},
+
+
+DisableDTR
+------------
+Input: none
+Output: none
+
+Description:
+Probably disable the data-terminal-ready signal.
+
+
+EnableDTR
+------------
+Input: none
+Output: none
+
+Description:
+Probably enable the data-terminal-ready signal
+
+
+DisableRTS
+------------
+Input: none
+Output: none
+
+Description:
+Probably disable the request-to-send signal.
+
+
+EnableRTS
+------------
+Input: none
+Output: none
+
+Description:
+Probably enable the request-to-send signal.
+
+
+Serial Port: Other fields
+=========================
+
+In addition to methods, the serial port also has one field "name", with the name of the serial port, one field "internal", which is a table with two fields, "handle" and "portnumber", both being numbers, and one field "settings", which is a table with baudrate, databits, stopbits (as numbers) and parity (as a single char string, in capital). They are not write-protected, but except handle, overwriting those fields values has no effect (beside modifying the value that would be read back from them).
+
+
+
+
+Appendix
+========
+
+If instead of the port name, you'd rather use the driver name, then you could use Lua functions such as:
+
+	function FindPortByDriverName(fullname)
+		local PortList=require("LuaRS232").SerialPortList()
+		if #PortList==0 then
+			error("Error, no serial port!")
+		end
+		local matches={}
+		for _,port in ipairs(PortList) do
+			if port.fullname==fullname then
+				table.insert(matches,port)
+			end
+		end
+		assert(#matches~=0,"Error, no serial port with a full name of "..fullname)
+		assert(#matches<=1,"Error, there are "..#matches.." serial port with a full name of "..fullname..", don't know which to pick")
+		return matches[1].name
+	end
+
+	function OpenPortByDriverName(fullname)
+		return require("LuaRS232").SerialPortOpen(FindPortByDriverName(fullname))
+	end
+
+And then you'd open the port with:
+	UART=OpenPortByDriverName("USB-SERIAL CH340")
+
+Which arguably is a more reliable to find a given device than its assigned port number
