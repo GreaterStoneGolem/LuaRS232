@@ -184,7 +184,9 @@ char* GetLastErrorStr(void)
 int LuaRS232_Open(lua_State* L)
 {
 	// Check that function was called with parameters of proper types
-	if(lua_gettop(L)<1 || !lua_isstring(L,1) || (lua_gettop(L)>=2 && !lua_isnumber(L,2)) || (lua_gettop(L)>=3 && !lua_isstring(L,3)))
+	if(lua_gettop(L)<1 ||       !(lua_isstring(L,1) || lua_isnil(L,1))
+		|| (lua_gettop(L)>=2 && !(lua_isnumber(L,2) || lua_isnil(L,2)))
+		|| (lua_gettop(L)>=3 && !(lua_isstring(L,3) || lua_isnil(L,3))))
 	{
 		lua_pushstring(L,"RS232 Open arguments must be (string) port name, plus optional (number) baudrate, (string) mode");
 		return lua_error(L);
@@ -192,9 +194,9 @@ int LuaRS232_Open(lua_State* L)
 
 
 	// Convert parameters from Lua stack to C variables, or use default values
-	const char* portname = lua_gettop(L)>=1 ? lua_tostring(L,1) : "COM1";
-	const int   baudrate = lua_gettop(L)>=2 ? lua_tonumber(L,2) : 115200;
-	const char* mode     = lua_gettop(L)>=3 ? lua_tostring(L,3) : "8N1";
+	const char* portname = lua_gettop(L)>=1 && !lua_isnil(L,1) ? lua_tostring(L,1) : "COM1";
+	const int   baudrate = lua_gettop(L)>=2 && !lua_isnil(L,2) ? lua_tonumber(L,2) : 115200;
+	const char* mode     = lua_gettop(L)>=3 && !lua_isnil(L,3) ? lua_tostring(L,3) : "8N1";
 
 
 	// Check that portname is a valid port name
@@ -421,24 +423,56 @@ int LuaRS232_Send(lua_State* L)
 int LuaRS232_Receive(lua_State* L)
 {
 	void* handle=GetPortHandle(L);
+	int wanted_byte_count=lua_isnumber(L,2) ? lua_tointeger(L,2) : (MAX_RECEIVE);
+	int actual_byte_count=0;
+	unsigned char* rbuffer=receptionbuffer;
+
+	// If using a custom size below the static buffer size, use the static buffer
+	// If using a custom size above the static buffer size, allocate a buffer dynamically
+	if(wanted_byte_count>MAX_RECEIVE)
+	{
+		unsigned char* rbuffer=(unsigned char*)malloc(wanted_byte_count);
+		if(!rbuffer)
+		{
+			lua_pushfstring(L,"RS232 Receive failed to allocate %d bytes",wanted_byte_count);
+			return lua_error(L);
+		}
+	}
+
+	// Just as a precaution, erase any previous data lingering there
+	memset(rbuffer,0,wanted_byte_count);
+
 	/* Using a void pointer cast, otherwise gcc will complain about */
 	/* "Warning: dereferencing type-punned pointer will break strict aliasing rules" */
-	int length;
-	if(!ReadFile(handle, receptionbuffer, MAX_RECEIVE, (LPDWORD)((void*)&length), NULL))
+	if(!ReadFile(handle, rbuffer, wanted_byte_count, (LPDWORD)((void*)&actual_byte_count), NULL))
 	{
+		if(rbuffer!=receptionbuffer)
+		{
+			free(rbuffer);
+		}
 		lua_pushfstring(L,"RS232 Receive failed: %s",GetLastErrorStr());
 		return lua_error(L);
 	}
-	if(length<0)
+	if(actual_byte_count<0)
 	{
-		lua_pushfstring(L,"RS232 Receive failed: Bad Read count: %d",length);
+		if(rbuffer!=receptionbuffer)
+		{
+			free(rbuffer);
+		}
+		lua_pushfstring(L,"RS232 Receive failed: Bad Read count: %d",actual_byte_count);
 		return lua_error(L);
 	}
-	if(length==MAX_RECEIVE)
+	// Print a message if no size selected at call, and default-size buffer filled up
+	if((!lua_isnumber(L,2)) && (actual_byte_count==wanted_byte_count))
 	{
-		printf("RS232 Receive filled its %d bytes buffer!\n",length);
+		printf("RS232 Receive filled its %d bytes buffer!\n",actual_byte_count);
 	}
-	lua_pushlstring(L,(char*)receptionbuffer,length);
+	// Make the reception buffer into a Lua string
+	lua_pushlstring(L,(char*)rbuffer,actual_byte_count);
+	if(rbuffer!=receptionbuffer)
+	{
+		free(rbuffer);
+	}
 	return 1;
 }
 

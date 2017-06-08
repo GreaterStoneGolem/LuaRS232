@@ -9,6 +9,15 @@ LuaRS232 = {
 	["SerialPortList"]   = function(...) ... end,
 	["SerialPortOpen"]   = function(...) ... end,
 	["Sleep"]            = function(...) ... end,
+	["version"]          =
+		{
+			["build"]  = 7,
+			["major"]  = 1,
+			["minor"]  = 0,
+			["patch"]  = 0,
+			["info"]   = "LuaRS232 version 1.0.0 built the Jun  8 2017 at 15:34:44",
+			["string"] = "1.0.0",
+		},
 },
 
 
@@ -16,11 +25,15 @@ LuaRS232 = {
 LuaRS232.SerialPortList("CreateFile") = {
 	[1] =
 		{
-			["name"] = "\\.\COM12",
+			["name"] = "\\.\COM3",
 		},
 	[2] =
 		{
-			["name"] = "\\.\COM13",
+			["name"] = "\\.\COM4",
+		},
+	[3] =
+		{
+			["name"] = "\\.\COM5",
 		},
 },
 
@@ -28,11 +41,15 @@ LuaRS232.SerialPortList("CreateFile") = {
 LuaRS232.SerialPortList("QueryDosDevice") = {
 	[1] =
 		{
-			["name"] = "COM12",
+			["name"] = "COM5",
 		},
 	[2] =
 		{
-			["name"] = "COM13",
+			["name"] = "COM3",
+		},
+	[3] =
+		{
+			["name"] = "COM4",
 		},
 },
 
@@ -40,11 +57,15 @@ LuaRS232.SerialPortList("QueryDosDevice") = {
 LuaRS232.SerialPortList("DefaultCommConfig") = {
 	[1] =
 		{
-			["name"] = "COM12",
+			["name"] = "COM3",
 		},
 	[2] =
 		{
-			["name"] = "COM13",
+			["name"] = "COM4",
+		},
+	[3] =
+		{
+			["name"] = "COM5",
 		},
 },
 
@@ -52,13 +73,18 @@ LuaRS232.SerialPortList("DefaultCommConfig") = {
 LuaRS232.SerialPortList("GUID_DEVINTERFACE_COMPORT") = {
 	[1] =
 		{
-			["fullname"] = "ATEN USB to Serial Bridge",
-			["name"]     = "COM12",
+			["fullname"] = "Serial Port, USB Multi-function Cable",
+			["name"]     = "COM5",
 		},
 	[2] =
 		{
-			["fullname"] = "Prolific USB-to-Serial Comm Port",
-			["name"]     = "COM13",
+			["fullname"] = "Intel(R) Active Management Technology - SOL",
+			["name"]     = "COM3",
+		},
+	[3] =
+		{
+			["fullname"] = "Silicon Labs CP210x USB to UART Bridge",
+			["name"]     = "COM4",
 		},
 },
 
@@ -66,13 +92,18 @@ LuaRS232.SerialPortList("GUID_DEVINTERFACE_COMPORT") = {
 LuaRS232.SerialPortList("DiClassGuidsFromNamePort") = {
 	[1] =
 		{
-			["fullname"] = "Prolific USB-to-Serial Comm Port",
-			["name"]     = "COM13",
+			["fullname"] = "Intel(R) Active Management Technology - SOL",
+			["name"]     = "COM3",
 		},
 	[2] =
 		{
-			["fullname"] = "ATEN USB to Serial Bridge",
-			["name"]     = "COM12",
+			["fullname"] = "Serial Port, USB Multi-function Cable",
+			["name"]     = "COM5",
+		},
+	[3] =
+		{
+			["fullname"] = "Silicon Labs CP210x USB to UART Bridge",
+			["name"]     = "COM4",
 		},
 },
 
@@ -80,16 +111,20 @@ LuaRS232.SerialPortList("DiClassGuidsFromNamePort") = {
 LuaRS232.SerialPortList("Registry") = {
 	[1] =
 		{
-			["name"] = "COM12",
+			["name"] = "COM3",
 		},
 	[2] =
 		{
-			["name"] = "COM13",
+			["name"] = "COM4",
+		},
+	[3] =
+		{
+			["name"] = "COM5",
 		},
 },
 
 
-Opened RS-232 communication on "COM13".
+Opened RS-232 communication on "COM3".
 LuaRS232.SerialPortOpen(...) = {
 	["Close"]        = function(...) ... end,
 	["DisableDTR"]   = function(...) ... end,
@@ -103,11 +138,11 @@ LuaRS232.SerialPortOpen(...) = {
 	["Receive"]      = function(...) ... end,
 	["Send"]         = function(...) ... end,
 	["Sleep"]        = function(...) ... end,
-	["name"]         = "\\.\COM13",
+	["name"]         = "\\.\COM3",
 	["internal"]     =
 		{
-			["handle"]     = 312,
-			["portnumber"] = 13,
+			["handle"]     = 300,
+			["portnumber"] = 3,
 		},
 	["settings"]     =
 		{
@@ -120,4 +155,4 @@ LuaRS232.SerialPortOpen(...) = {
 
 
 
-Closed RS-232 communication on "COM13".
+Closed RS-232 communication on "COM3".

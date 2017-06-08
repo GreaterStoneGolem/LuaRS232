@@ -2,11 +2,11 @@
 -- Program to listen to UART
 -- Example usage:
 -- lua-5.3.1\bin\lua53.exe HeyListen.lua COM12
+-- lua-5.3.1\bin\lua53.exe HeyListen.lua COM12 115200 8N1
 
-local PortName=...
 local LuaRS232=require("LuaRS232")
-local UART=LuaRS232.SerialPortOpen(PortName)
-print("Listening to serial port "..PortName..", press any key to exit")
+local UART=LuaRS232.SerialPortOpen(...)
+print("Listening to serial port "..UART.name..", press any key to exit")
 while true do
 	local k=LuaRS232.GetKeyPress()
 	if k~=0 then

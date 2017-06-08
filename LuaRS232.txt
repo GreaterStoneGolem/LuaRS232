@@ -16,13 +16,16 @@ In addition a couple helper functions are provided, in particular:
 
 Dependencies:
 - Windows only at the moment, because I don't have a Linux box at hand to test it on
-- It's meang to be used by a Lua script, and to run Lua scripts you need [lua53.exe] and [lua53.dll]
+- It's meant to be used by a Lua script, and to run Lua scripts you need [lua53.exe] and [lua53.dll]
 - Get Lua binaries from http://sourceforge.net/projects/luabinaries/files/5.3/Tools%20Executables/lua-5.3_Win32_bin.zip
 - Get Lua sources (if you need to recompile) from http://www.lua.org/ftp/lua-5.3.1.tar.gz
 
 There are no returned error codes, instead Lua errors are thrown when anything goes wrong. Use pcall if you need to proceed despite errors.
 
-Messages are printed to stdout when library is loaded, when a serial port communication is opened and closed, and when Receive returns the maximum amount of bytes.
+Messages are printed to stdout:
+- When library is loaded,
+- When a serial port communication is opened and closed,
+- When Receive is called without argument and returns the maximum amount of bytes.
 Otherwise data is passed as Lua variables and must be explicitly printed as needed.
 
 Since Lua strings are not zero terminated and can contain any bytes, there is no distinction between binary mode and text mode.
@@ -103,21 +106,36 @@ Example:
 				["fullname"] = "ATEN USB to Serial Bridge",
 				["name"]     = "COM15",
 			},
+		[4] =
+			{
+				["fullname"] = "Serial Port, USB Multi-function Cable",
+				["name"]     = "COM5",
+			},
+		[5] =
+			{
+				["fullname"] = "Silicon Labs CP210x USB to UART Bridge",
+				["name"]     = "COM4",
+			},
 	},
 
 
 (function) SerialPortOpen
 ---------------
-(table) port Open( portname )
+(table) port Open( (string) portname, (number) baudrate, (string) mode )
 
-Input: A port name, either "COMxx" or "\\.\COMxx" where xx is the port number.
-If you use the second form, take care that \ needs to be escaped, so you have to actually write either "\\\\.\\COMxx" or [[\\.\COMxx]]
+Input (all three are optionals):
+- A port name (string), either "COMxx" or "\\.\COMxx" where xx is the port number, default to "COM1"
+  If you use the second form, take care that \ needs to be escaped, so you have to actually write either "\\\\.\\COMxx" or [[\\.\COMxx]]
+- A baud rate (number), must be amongst the allowed ones, default to 115200.
+- A mode (string), which is a three characters string defining the number of data bits, the parity and the number of stop bits, default to "8N1"
 
 Return: A table providing interface and handle to the comm port that was opened.
 
 This table has a metatable to automatically call Close as soon as it's garbage collected.
-The functions in this table expect their first argument to be the table, they are member function, to be called with :
-The open port is tracked by its handle, the field name and portnumber are just for information.
+The functions in this table expect their first argument to be the table, or a handle.
+Call them as member function, that is with a : and not a .
+The open port is tracked by its handle, the fields "name" and "portnumber" are just for information.
+The settings are for information too, changing them won't change the actual port settings.
 
 Example:
 	LuaRS232.SerialPortOpen("COM12") ->
@@ -215,6 +233,19 @@ Example:
 LuaRS232.Sleep(500)-- Sleep half a second
 
 
+(table) version
+---------------------------
+Contains version information in various formats.
+
+	["version"] =
+		{
+			["major"]  = 1, -- (number) Increased when changes in interface make it no longer backward compatible
+			["minor"]  = 0, -- (number) Increased when backward-compatible functionality is added, reset when major is increased
+			["patch"]  = 0, -- (number) Increased for backward compatible bug fixes, reseted when minor or major increased
+			["build"]  = 7, -- (number) Only ever increased
+			["string"] = "1.0.0", -- (string)
+			["info"]   = "LuaRS232 version 1.0.0 built the __DATE__ at __TIME__", -- (string)
+		},
 
 
 Serial Port: Intro
@@ -251,18 +282,30 @@ Since Lua already allocates whatever string you send, there is no size limit in 
 
 Receive
 -------
-Input: None
+Input: Nothing, or how many bytes to receive.
 Output: A Lua string, may or may not be printable.
 
-It returns the content of the serial port buffer at the moment it was called. Calling Receive empties the buffer.
-If you need polling, you have to implement it yourself using Receive and Sleep.
-If you need to deal with complete frame and not just stream of bytes, you'll have to implement frame bufferisation yourself.
+It returns the content of the serial port buffer at the moment it was called.
+It also empties the uart driver buffer of the bytes returned.
 
-This library used a fixed internal buffer of 1024 for reception, so Receive will return at max 1024 bytes. Call it again if you need more bytes.
-Beside a message printed in stdout or checking returned string size, there's no easy way to know that happened.
-This buffer is independent from any buffer of the serial port driver itself.
+If you pass a number as argument, it will not return more than this many bytes. The rest remain in the uart driver.
+If you don't pass a number as argument, then by default it won't return more than 1024 bytes.
+If you call Receive without specifying a size and the buffer of 1024 bytes gets filled, a message is printed in stdout.
 
-Some RS232 terminals end lines with a return carriage ("\r") without a new line ("\n"). If you receive and print that, then the end will be displayed over the start. This is independent from RS232 library and driver, even in plain Lua print("123456\rABC") results in ABC456. If this is a problem, I suggest using something like print((UART:Receive():gsub("[\r\n]+","\r\n")))
+Either way:
+- If there are less bytes available, it will only return what's available.
+- If there are more bytes available, it will leave the extra bytes in the uart driver, ready to be fetch at next call.
+
+
+Remarks:
+
+- If there are more bytes ready than asked, you may want to call Receive repeatedly, until it returns an empty string.
+
+- If you need polling, you have to implement it yourself using Receive and Sleep.
+
+- If you need to deal with complete frame and not just stream of bytes, you'll have to implement frame bufferisation yourself.
+
+- Some RS232 terminals end lines with a return carriage ("\r") without a new line ("\n"). If you receive and print that, then the end will be displayed over the start. This is independent from RS232 library and driver, even in plain Lua print("123456\rABC") results in ABC456. If this is a problem, I suggest using something like print((UART:Receive():gsub("[\r\n]+","\r\n")))
 
 
 Close
@@ -401,4 +444,6 @@ If instead of the port name, you'd rather use the driver name, then you could us
 And then you'd open the port with:
 	UART=OpenPortByDriverName("USB-SERIAL CH340")
 
-Which arguably is a more reliable to find a given device than its assigned port number
+Which arguably is a more reliable to find a given device than its assigned port number.
+
+A more complete example may be found in JustListen.lua

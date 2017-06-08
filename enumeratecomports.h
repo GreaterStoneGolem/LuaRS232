@@ -25,6 +25,7 @@ BOOL EnumerateComPortByGetDefaultCommConfig(UINT* pPortCount, TCHAR* pPortNames)
 BOOL EnumerateComPortSetupAPI_GUID_DEVINTERFACE_COMPORT(UINT* pPortCount, TCHAR* pPortNames, TCHAR* pFriendlyNames);
 BOOL EnumerateComPortSetupAPISetupDiClassGuidsFromNamePort(UINT* pPortCount, TCHAR* pPortNames, TCHAR* pFriendlyNames);
 BOOL EnumerateComPortRegistry(UINT* pPortCount, TCHAR* pPortNames);
+void BenchmarkEnumComPorts(void);
 
 /*
 	The output is :
