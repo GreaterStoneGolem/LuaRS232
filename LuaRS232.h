@@ -7,7 +7,12 @@
 extern "C" {
 #endif
 
-int __declspec(dllexport) luaopen_LuaRS232(lua_State* L);
+#ifdef _WIN32
+	int __declspec(dllexport) luaopen_LuaRS232(lua_State* L); // Windows
+#else
+	int luaopen_LuaRS232(lua_State* L); // Linux
+#endif
+
 
 #ifdef __cplusplus
 }

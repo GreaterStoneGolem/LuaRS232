@@ -1,4 +1,5 @@
 
+#ifdef _WIN32
 
 /*
 	Enumerating com ports in Windows
@@ -13,6 +14,7 @@
 
 	No copyright, welcome to use for everyone.
 */
+
 
 #include <windows.h>
 
@@ -893,7 +895,7 @@ void BenchmarkEnumComPorts(void)
 		_tprintf(TEXT("\t%s\n"), &portNames[i][0]);
 
 
-	_tprintf(TEXT("\nQueryDosDevice method : "));
+	_tprintf(TEXT("\nQueryDosDevice method : \n"));
 	for(i = 0; i< MAX_PORT_NUM; i++)
 		ZeroMemory(&portNames[i][0], MAX_STR_LEN);
 	TIMER_BEGIN(EnumerateComPortQueryDosDevice);
@@ -957,6 +959,21 @@ void BenchmarkEnumComPorts(void)
 	for(i = 0; i< n; i++)
 		_tprintf(TEXT("\t%s\n"), &portNames[i][0]);
  
-}/* main */
+}
 
+
+
+#elif __linux__
+
+/*
+	On Linux:
+	ls /dev/tty*
+	cat /proc/tty/drivers
+	ls /dev/serial/by-id
+	ls /dev/serial/by-path
+*/
+
+#else
+
+#endif
 

@@ -1,12 +1,20 @@
+#!/usr/local/bin/lua
 
--- Program that implement a serial console in Lua
+-- Program that implement a serial console in Lua.
+-- Keypresses are sent back through TX, except the Esc key which makes the script exit.
+-- Control characters received are escaped.
 
--- Basically I wanted something like HyperTerminal, but scriptable instead of mouse/keyboard GUI.
+-- Example usages:
+-- Windows:
+--   lua53.exe SerialConsole.lua
+--   lua53.exe SerialConsole.lua COM5
+--   lua53.exe SerialConsole.lua "Serial Port, USB Multi-function Cable" 115200 8N1
+-- Linux:
+--   sudo ./SerialConsole.lua
+--   sudo ./SerialConsole.lua ttyUSB0
+--   sudo ./SerialConsole.lua ttyUSB0 115200 8N1
+-- ...
 
--- Example usage:
---   lua53 SerialConsole.lua
---   lua53 SerialConsole.lua COM5 115200 8N1
---   lua53 SerialConsole.lua "Serial Port, USB Multi-function Cable" 115200 8N1
 
 -- First argument can be either a comm port number, or a driver name.
 -- Arguments are optional: you can have zero, one, two, all three arguments.
@@ -16,17 +24,19 @@
 -- It relies on the other end for echo. If not, please uncomment antepenultimate line.
 
 
--- Use the serial port with that driver name if none passed as argument
-local DriverName="Serial Port, USB Multi-function Cable"
 
 -- Load library
 local LuaRS232=require("LuaRS232")
 
 -- Function to convert a driver name, for exemple "USB to Serial Bridge", to a Comm Port, for exemple "COM5"
+-- If no name passed, return the first port found
 local function FindPortByDriverName(name)
 	local PortList=LuaRS232.SerialPortList()
 	if #PortList==0 then
 		error("Error, no serial port!")
+	end
+	if not name then
+		return PortList[1].name
 	end
 	local matches={}
 	for _,port in ipairs(PortList) do
@@ -45,7 +55,7 @@ end
 -- Get commandline arguments
 local Port,Baud,Mode=...
 
-local UART=LuaRS232.SerialPortOpen(FindPortByDriverName(Port or DriverName),tonumber(Baud),Mode)
+local UART=LuaRS232.SerialPortOpen(FindPortByDriverName(Port),tonumber(Baud),Mode)
 
 -- Note: Exemple usage:
 --local UART=LuaRS232.SerialPortOpen("COM5",115200,"8N1")
@@ -100,8 +110,7 @@ repeat
 				return c
 			end
 		end)
-	rx=rx:gsub("[\r\n]+","\r\n")
-	rx=rx:gsub("([^\r\n])(ipcl@)","%1\r\n%2")
+	rx=rx:gsub("[\r\n]+","\r\n")-- Replace any number of return carriage and new line by a windows style line ending
 	io.write(rx)
 	local key=LuaRS232.GetKeyPress()
 	if key==27 then

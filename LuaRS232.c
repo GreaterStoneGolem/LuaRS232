@@ -12,9 +12,9 @@
 #define QUOTE(s) NXQUOTE(s) // QUOTE: Expand macro argument
 
 #define VERSION_MAJOR    1 // Increase when changes in interface make it no longer backward compatible
-#define VERSION_MINOR    0 // Increase when backward-compatible functionality is added, reset when major increase
+#define VERSION_MINOR    1 // Increase when backward-compatible functionality is added, reset when major increase
 #define VERSION_PATCH    0 // Increase for backward compatible bug fixes, reset when minor or major increase
-#define VERSION_BUILD    7 // Only ever increase this number
+#define VERSION_BUILD    8 // Only ever increase this number
 #define VERSION_STRING  QUOTE(VERSION_MAJOR) "." QUOTE(VERSION_MINOR) "." QUOTE(VERSION_PATCH)
 #define VERSION_INFO    "LuaRS232 version " VERSION_STRING " built the " __DATE__ " at " __TIME__
 
@@ -62,7 +62,12 @@ static const struct luaL_Reg LuaRS232API[] = {
 // Entry point of the API of LuaRS232.dll
 // Doing a require("LuaRS232") returns one dictionary-like table with:
 // - All the functions listed in the table above
-int __declspec(dllexport) luaopen_LuaRS232(lua_State* L)
+
+#ifdef _WIN32
+int __declspec(dllexport) luaopen_LuaRS232(lua_State* L) // Windows
+#else
+int luaopen_LuaRS232(lua_State* L) // Linux  
+#endif
 {
 	// Create new table, which will be the library
 	lua_newtable(L);

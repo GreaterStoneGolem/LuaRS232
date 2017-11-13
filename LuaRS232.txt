@@ -5,7 +5,7 @@ LuaRS232 Content Overview
 
 LuaRS232.dll is a library to use a serial port (aka Com Port, aka UART, aka RS232) in Lua.
 
-It is a C to Lua wrapper around Windows API functions such as CreateFileA and SetCommState.
+It is a C to Lua wrapper around Windows / Linux API functions such as CreateFileA / WriteFile / SetCommState, or open / write / tcsetattr
 
 In addition a couple helper functions are provided, in particular:
 - to convert binary strings into their printable hexadecimal representation and back
@@ -15,7 +15,7 @@ In addition a couple helper functions are provided, in particular:
 
 
 Dependencies:
-- Windows only at the moment, because I don't have a Linux box at hand to test it on
+- Windows or Linux (not ported to other OS)
 - It's meant to be used by a Lua script, and to run Lua scripts you need [lua53.exe] and [lua53.dll]
 - Get Lua binaries from http://sourceforge.net/projects/luabinaries/files/5.3/Tools%20Executables/lua-5.3_Win32_bin.zip
 - Get Lua sources (if you need to recompile) from http://www.lua.org/ftp/lua-5.3.1.tar.gz

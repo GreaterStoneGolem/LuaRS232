@@ -3,6 +3,7 @@
 -- Example usage:
 -- lua-5.3.1\bin\lua53.exe HeyListen.lua COM12
 -- lua-5.3.1\bin\lua53.exe HeyListen.lua COM12 115200 8N1
+-- sudo lua HeyListen.lua ttyUSB0
 
 local LuaRS232=require("LuaRS232")
 local UART=LuaRS232.SerialPortOpen(...)

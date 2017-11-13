@@ -1,6 +1,4 @@
 
-
-
 /*
 	Enumerating com ports in Windows
 
@@ -19,6 +17,7 @@
 #define MAX_PORT_NUM      (256)
 #define MAX_STR_LEN       (256*sizeof(TCHAR))
 
+#ifdef _WIN32
 BOOL EnumerateComPortByCreateFile(UINT* pPortCount, TCHAR* pPortNames);
 BOOL EnumerateComPortQueryDosDevice(UINT* pPortCount, TCHAR* pPortNames);
 BOOL EnumerateComPortByGetDefaultCommConfig(UINT* pPortCount, TCHAR* pPortNames);
@@ -81,3 +80,7 @@ void BenchmarkEnumComPorts(void);
 			COM1
 			COM4
 */
+
+#elif __linux__
+#else
+#endif

@@ -5,6 +5,8 @@
 --   lua53.exe JustListen.lua COM5
 -- or:
 --   lua-5.3.1\bin\lua53.exe JustListen.lua "Acme USB-to-Serial Bridge" 115200 "8N1"
+-- or on Linux:
+--   sudo lua JustListen.lua ttyUSB0
 
 -- If an invalid name is passed, it will print the list of available port along with the error message
 -- Control characters are replaced by their abbrieviation, between <>, before being printed
