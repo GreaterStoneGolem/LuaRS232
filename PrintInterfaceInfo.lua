@@ -1,3 +1,4 @@
+#!/usr/local/bin/lua
 
 -- Program to print content of LuaRS232 and LuaRS232.SerialPortOpen(...)
 -- Example usage:
@@ -94,16 +95,21 @@ print("LuaRS232 = "..tostring(LuaRS232))
 print("")
 
 print("")
-for _,Method in ipairs{
+for _,Method in ipairs(({
+	[ [[\]] ]={-- Windows
 		"CreateFile",
 		"QueryDosDevice",
 		"DefaultCommConfig",
 		"GUID_DEVINTERFACE_COMPORT",
 		"DiClassGuidsFromNamePort",
 		"Registry",
-	} do
-	print("LuaRS232.SerialPortList(\""..Method.."\") = "..tostring(LuaRS232.SerialPortList(Method)))
-	print("")
+	},[ [[/]] ]={-- Linux
+		"/sys/class/tty/",
+		"/dev/serial/by-id/",
+		"/dev/serial/by-path/"
+	}})[package.config:sub(1,1)]) do
+		print("LuaRS232.SerialPortList(\""..Method.."\") = "..tostring(LuaRS232.SerialPortList(Method)))
+		print("")
 end
 
 -- Using first port if none provided

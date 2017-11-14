@@ -1,3 +1,4 @@
+#!/usr/local/bin/lua
 
 -- Script to send a file via XModem
 --

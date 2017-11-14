@@ -10,9 +10,10 @@
 --   lua53.exe SerialConsole.lua COM5
 --   lua53.exe SerialConsole.lua "Serial Port, USB Multi-function Cable" 115200 8N1
 -- Linux:
---   sudo ./SerialConsole.lua
---   sudo ./SerialConsole.lua ttyUSB0
---   sudo ./SerialConsole.lua ttyUSB0 115200 8N1
+--   sudo adduser $USER dialout # Permanently allow you to use serial port
+--   ./SerialConsole.lua
+--   ./SerialConsole.lua ttyUSB0
+--   ./SerialConsole.lua ttyUSB0 115200 8N1
 -- ...
 
 

@@ -33,6 +33,8 @@ Bin2Hex and Hex2Bin are provided as convenience to write and read binary. But yo
 
 
 Usage:
+First of all, if under linux, you need to allow yourself to use serial ports:
+	sudo adduser $USER dialout
 At the beginning of your Lua script, have:
 	local LuaRS232=require("LuaRS232")
 This create a table, LuaRS232, with:
@@ -82,7 +84,9 @@ LuaRS232 Members
 
 Input: Either nothing for default method, or the name of the method to use.
 
-There are many different ways to retrieve the list of serial port under Windows. Six of them are implemented in that library: "CreateFile", "QueryDosDevice", "DefaultCommConfig", "GUID_DEVINTERFACE_COMPORT", "DiClassGuidsFromNamePort", "Registry". The default, used if no argument is provided, is DiClassGuidsFromNamePort. They don't return exactly the same thing: Only with CreateFile there is the leading \\.\ and only with GUID_DEVINTERFACE_COMPORT and DiClassGuidsFromNamePort are the fullname available.
+Under Windows there are many different ways to retrieve the list of serial port. Six of them are implemented in the LuaRS232 library: "CreateFile", "QueryDosDevice", "DefaultCommConfig", "GUID_DEVINTERFACE_COMPORT", "DiClassGuidsFromNamePort", "Registry". The default, used if no argument is provided, is DiClassGuidsFromNamePort. They don't return exactly the same thing: Only with CreateFile there is the leading \\.\ and only with GUID_DEVINTERFACE_COMPORT and DiClassGuidsFromNamePort are the fullname available.
+
+Under Linux there are also many different ways to retrieve the list of serial port. Three of them are implemented in the LuaRS232 library: "/sys/class/tty/", "/dev/serial/by-id/", "/dev/serial/by-path/". The default, used if no argument is provided, is "/dev/serial/by-id/". They don't return exactly the same thing. For example "/sys/class/tty/" returns more like possible port than actual ports port. "/dev/serial/by-path/" and "/dev/serial/by-id/" returns only actual serial ports, but I find the names from "/dev/serial/by-id/" much nicer.
 
 Return: A list of comm port, where each device is a table with a "name" fields, and for some methods, a "fullname" field.
 This table is not sorted. And content may varies depending on which method was used.
@@ -446,4 +450,4 @@ And then you'd open the port with:
 
 Which arguably is a more reliable to find a given device than its assigned port number.
 
-A more complete example may be found in JustListen.lua
+A more complete example may be found in SerialConsole.lua

@@ -14,10 +14,11 @@
 */
 
 
+#ifdef _WIN32
+
 #define MAX_PORT_NUM      (256)
 #define MAX_STR_LEN       (256*sizeof(TCHAR))
 
-#ifdef _WIN32
 BOOL EnumerateComPortByCreateFile(UINT* pPortCount, TCHAR* pPortNames);
 BOOL EnumerateComPortQueryDosDevice(UINT* pPortCount, TCHAR* pPortNames);
 BOOL EnumerateComPortByGetDefaultCommConfig(UINT* pPortCount, TCHAR* pPortNames);
@@ -82,5 +83,13 @@ void BenchmarkEnumComPorts(void);
 */
 
 #elif __linux__
+
+	#define MAX_PORT_NUM      (256)
+	#define MAX_STR_LEN       (512)
+
+	void EnumerateComPort_sys_class_tty(unsigned int* pPortCount, char PortNames[MAX_PORT_NUM][MAX_STR_LEN], char longNames[MAX_PORT_NUM][MAX_STR_LEN]);
+	void EnumerateComPort_dev_serial_by_id(unsigned int* pPortCount, char PortNames[MAX_PORT_NUM][MAX_STR_LEN], char FriendlyNames[MAX_PORT_NUM][MAX_STR_LEN]);
+	void EnumerateComPort_dev_serial_by_path(unsigned int* pPortCount, char PortNames[MAX_PORT_NUM][MAX_STR_LEN], char FriendlyNames[MAX_PORT_NUM][MAX_STR_LEN]);
+
 #else
 #endif

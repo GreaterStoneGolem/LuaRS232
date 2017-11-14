@@ -14,7 +14,7 @@
 #define VERSION_MAJOR    1 // Increase when changes in interface make it no longer backward compatible
 #define VERSION_MINOR    1 // Increase when backward-compatible functionality is added, reset when major increase
 #define VERSION_PATCH    0 // Increase for backward compatible bug fixes, reset when minor or major increase
-#define VERSION_BUILD    8 // Only ever increase this number
+#define VERSION_BUILD   10 // Only ever increase this number
 #define VERSION_STRING  QUOTE(VERSION_MAJOR) "." QUOTE(VERSION_MINOR) "." QUOTE(VERSION_PATCH)
 #define VERSION_INFO    "LuaRS232 version " VERSION_STRING " built the " __DATE__ " at " __TIME__
 

@@ -967,11 +967,134 @@ void BenchmarkEnumComPorts(void)
 
 /*
 	On Linux:
-	ls /dev/tty*
 	cat /proc/tty/drivers
+	ls /dev/tty*
 	ls /dev/serial/by-id
 	ls /dev/serial/by-path
 */
+
+#include <dirent.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include "enumeratecomports.h"
+
+char* FollowSymbolicLink(const char* path,const char* file)
+{
+	// Make fullpath = path+file
+	char fullpath[MAX_STR_LEN];
+	strncpy(fullpath,path,MAX_STR_LEN);
+	strncat(fullpath,file,MAX_STR_LEN);
+	fullpath[MAX_STR_LEN-1]=0;
+
+	static char linkto[MAX_STR_LEN];
+	int ret=readlink(fullpath,linkto,MAX_STR_LEN-1);
+	if(ret<0)
+	{
+		strncpy(linkto,"readlink error: ",MAX_STR_LEN);
+		strncat(linkto,strerror(errno),MAX_STR_LEN);
+	}
+	else
+	{
+		linkto[ret]=0;
+	}
+	return linkto;
+}
+
+// Modify a string in place to keep only what's right of last slash
+// For exemple "../../ttyUSB0" -> "ttyUSB0"
+// Though if the slash is the last char, then it keeps what's before
+void CutPath(char* str)
+{
+	int i,j;
+	for(j=strlen(str)-1;j>0;--j)
+	{
+		if(str[j-1]=='/')
+			break;
+	}
+	for(i=0;str[j+i];++i)
+	{
+		str[i]=str[j+i];
+	}
+	str[i]=0;
+}
+
+
+void GetFolderContent(const char* folder, unsigned int* nbr_files, char filename[MAX_PORT_NUM][MAX_STR_LEN], char linkto[MAX_PORT_NUM][MAX_STR_LEN])
+{
+	*nbr_files=0;
+	struct dirent **entries;
+	int nbr_of_entries=scandir(folder, &entries, NULL, alphasort);
+	if(nbr_of_entries<0)
+	{
+		printf("scandir %s error: %s\n",folder,strerror(errno));
+		return;
+	}
+	if(nbr_of_entries>MAX_PORT_NUM)
+	{
+		printf("Too many entries in %s has only room for %u and there are %d\n",folder,MAX_PORT_NUM,nbr_of_entries);
+	}
+	int k,j;
+	for(k=0,j=0;k<nbr_of_entries;++k)
+	{
+		if(!( (strcmp(entries[k]->d_name,".")==0) || (strcmp(entries[k]->d_name,"..")==0)))
+		{
+			if(k<MAX_PORT_NUM)
+			{
+				memset(filename[j],0,sizeof(filename[j]));
+				memset(linkto[j],0,sizeof(linkto[j]));
+				strncpy(filename[j],entries[k]->d_name,sizeof(filename[j])-2);
+				if(entries[k]->d_type==DT_LNK)
+				{
+					strncpy(linkto[j],FollowSymbolicLink(folder,entries[k]->d_name),sizeof(linkto[j])-2);
+				}
+				++*nbr_files;
+				++j;
+			}
+		}
+		free(entries[k]);
+	}
+	free(entries);
+}
+
+
+
+void EnumerateComPort_sys_class_tty(unsigned int* pPortCount, char PortNames[MAX_PORT_NUM][MAX_STR_LEN], char longNames[MAX_PORT_NUM][MAX_STR_LEN])
+{
+	GetFolderContent("/sys/class/tty/",pPortCount,PortNames,longNames);
+}
+
+void EnumerateComPort_dev_serial_by_id(unsigned int* pPortCount, char PortNames[MAX_PORT_NUM][MAX_STR_LEN], char FriendlyNames[MAX_PORT_NUM][MAX_STR_LEN])
+{
+	GetFolderContent("/dev/serial/by-id/",pPortCount,FriendlyNames,PortNames);
+	int i,j,k;
+	for(k=0;k<*pPortCount;++k)
+	{
+		for(j=strlen(PortNames[k])-1;j>0;--j)
+		{
+			if(PortNames[k][j-1]=='/')
+				break;
+		}
+		for(i=0;PortNames[k][j+i];++i)
+		{
+			PortNames[k][i]=PortNames[k][j+i];
+		}
+		PortNames[k][i]=0;
+	}
+}
+
+void EnumerateComPort_dev_serial_by_path(unsigned int* pPortCount, char PortNames[MAX_PORT_NUM][MAX_STR_LEN], char FriendlyNames[MAX_PORT_NUM][MAX_STR_LEN])
+{
+	GetFolderContent("/dev/serial/by-path/",pPortCount,FriendlyNames,PortNames);
+	int i,j,k;
+	for(k=0;k<*pPortCount;++k)
+	{
+		CutPath(PortNames[k]);
+	}
+}
+
 
 #else
 
